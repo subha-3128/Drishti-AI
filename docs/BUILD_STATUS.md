@@ -25,7 +25,8 @@
 - [x] **Milestone 7:** Dataset evaluation harness (`evaluate_mirage.mjs`), Python validator tests, Vitest suite, and GitHub Actions CI
 
 ## Known Limitations & Verified Device Metrics
-- **Mirage Inference Latency:** Measured **~976 ms median** in Node WASM (Apple Silicon) and **2,500+ ms/frame** on a physical Android phone (`I2127`, Qualcomm Snapdragon 4 Gen 1 `holi`, Chrome single-threaded WASM). Achieving <500 ms on mobile requires switching from single-threaded browser WASM to a Capacitor JNI bridge calling native `releases/4.1.4/android-arm64/libcactus.a` across multiple threads.
+- **Tier 1 Real-Time Latency (`I2127`):** Measured **150–200 ms/frame (~5–6 FPS)** live on `I2127` (Qualcomm Snapdragon 4 Gen 1 `holi`, Android 14 Chrome) via `MediaPipe EfficientDet-Lite0` — a >12× speedup from the previous Mirage-only `2,500+ ms/frame` WASM baseline.
+- **Tier 2 Mirage Latency:** Measured **~979 ms median** in Node WASM (Apple Silicon) and **2,500+ ms/frame** on `I2127` CPU WASM; now offloaded to background scene-enrichment (`6s` interval) so it never blocks Tier 1.
 - **APK Compilation:** Requires Android SDK / Android Studio locally (`./gradlew assembleDebug`) because Android SDK tools are not installed on this machine.
 - **PWA Background/Screen-Lock:** Browser PWA mode pauses camera when backgrounded or screen-locked; native foreground background-camera mode requires a Capacitor Foreground Service plugin when compiling on Android.
 - **Indian Hazards:** No Indian pedestrian hazard dataset evaluated yet; custom Indian hazard classes (`pothole`, `open_drain`, `open_manhole`, `broken_footpath`, `auto_rickshaw`) remain disabled (`enabled: false`).

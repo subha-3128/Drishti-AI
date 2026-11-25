@@ -26,8 +26,8 @@ export interface CameraCallbacks {
   onError: (message: string) => void;
 }
 
-const TARGET_WIDTH = 640;
-const TARGET_HEIGHT = 480;
+const TARGET_WIDTH = 480;
+const TARGET_HEIGHT = 360;
 const CAPTURE_MAX_WIDTH = 320;
 const FREEZE_TIMEOUT_MS = 3000;
 

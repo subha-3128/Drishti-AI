@@ -27,7 +27,7 @@ import { SafetyView } from './screens/SafetyView';
 
 type Tab = 'home' | 'settings' | 'safety';
 const FAST_MODEL_URL = '/models/efficientdet_lite0.tflite';
-const MIRAGE_INTERVAL_MS = 4500;
+const MIRAGE_INTERVAL_MS = 6000;
 const TICK_INTERVAL_MS = 2000;
 
 export default function App() {

@@ -95,7 +95,7 @@ export class FastDetectorService {
           delegate: 'GPU',
         },
         runningMode: 'VIDEO',
-        maxResults: 8,
+        maxResults: 5,
         scoreThreshold: minConfidence,
       });
       this.delegate = 'GPU';
@@ -107,7 +107,7 @@ export class FastDetectorService {
           delegate: 'CPU',
         },
         runningMode: 'VIDEO',
-        maxResults: 8,
+        maxResults: 5,
         scoreThreshold: minConfidence,
       });
       this.delegate = 'CPU';

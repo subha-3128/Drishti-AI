@@ -6,12 +6,12 @@ export interface AdaptiveFrameParams {
 }
 
 const FAST_ACTIVE_DELAY_MS = 45;
-const BASE_DELAY_MS = 100;
+const BASE_DELAY_MS = 70;
 const YIELD_DELAY_MS = 60;
 const STATIONARY_DELAY_MS = 2200;
 
 /**
- * Computes inter-frame delay to deliver smooth 15-20+ FPS tracking when GPU-accelerated,
+ * Computes inter-frame delay to deliver smooth tracking on mobile GPU/CPU,
  * minimize idle gaps on slower CPUs, and conserve battery when standing still.
  */
 export function computeNextFrameDelayMs(params: AdaptiveFrameParams): number {
@@ -21,7 +21,7 @@ export function computeNextFrameDelayMs(params: AdaptiveFrameParams): number {
   if (params.batterySaverEnabled && params.isStationary) {
     return STATIONARY_DELAY_MS;
   }
-  if (params.inferenceMs <= 120) {
+  if (params.inferenceMs <= 250) {
     return FAST_ACTIVE_DELAY_MS;
   }
   if (params.inferenceMs > 1200) {
