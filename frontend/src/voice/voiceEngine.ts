@@ -50,6 +50,7 @@ export class VoiceEngine {
   private rate = 1.05;
   private volume = 1.0;
   private hapticsEnabled = true;
+  private speechAlertsEnabled = true;
   private spatialAudioEnabled = true;
   private scanningTickEnabled = true;
   private availabilityListeners = new Set<(avail: VoiceAvailability) => void>();
@@ -122,12 +123,16 @@ export class VoiceEngine {
   configure(options: {
     rate?: number;
     volume?: number;
+    speechAlertsEnabled?: boolean;
     hapticsEnabled?: boolean;
     spatialAudioEnabled?: boolean;
     scanningTickEnabled?: boolean;
   }): void {
     if (typeof options.rate === 'number') this.rate = options.rate;
     if (typeof options.volume === 'number') this.volume = options.volume;
+    if (typeof options.speechAlertsEnabled === 'boolean') {
+      this.speechAlertsEnabled = options.speechAlertsEnabled;
+    }
     if (typeof options.hapticsEnabled === 'boolean') this.hapticsEnabled = options.hapticsEnabled;
     if (typeof options.spatialAudioEnabled === 'boolean') {
       this.spatialAudioEnabled = options.spatialAudioEnabled;
@@ -178,6 +183,7 @@ export class VoiceEngine {
       this.playSpatialCue(priority, direction);
     }
 
+    if (!this.speechAlertsEnabled && priority !== 'P0') return;
     if (!this.isSupported()) return;
 
     if (

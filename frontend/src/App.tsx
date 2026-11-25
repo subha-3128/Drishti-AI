@@ -1,11 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Play,
-  Stop,
+  Camera,
+  CaretDown,
+  CaretUp,
+  CheckCircle,
+  Cpu,
+  Eye,
+  EyeSlash,
+  GearSix,
+  HourglassHigh,
   House,
-  Sliders,
-  ShieldWarning,
+  Megaphone,
+  Moon,
+  PlayCircle,
+  Question,
+  RadioButton,
+  SpeakerHigh,
+  StopCircle,
+  Sun,
   WarningCircle,
+  X,
 } from '@phosphor-icons/react';
 import { AppState, transitionAppState } from './app/stateMachine';
 import { CameraManager, CameraStatus } from './camera/cameraManager';
@@ -20,12 +34,14 @@ import { VoiceAvailability, VoiceEngine } from './voice/voiceEngine';
 import { MicrophoneVad } from './voice/microphoneVad';
 import { parseVoiceCommand } from './voice/voiceCommandParser';
 import { DrishtiSettings, loadSettings, saveSettings } from './storage/settings';
+import { BrandMark } from './components/BrandMark';
 import { StatusPanel } from './components/StatusPanel';
 import { OnboardingView } from './screens/OnboardingView';
 import { SettingsView } from './screens/SettingsView';
+import { OfflineStatusView } from './screens/OfflineStatusView';
 import { SafetyView } from './screens/SafetyView';
 
-type Tab = 'home' | 'settings' | 'safety';
+type Tab = 'home' | 'settings' | 'safety' | 'offline';
 const FAST_MODEL_URL = '/models/efficientdet_lite0.tflite';
 const MIRAGE_INTERVAL_MS = 6000;
 const TICK_INTERVAL_MS = 2000;
@@ -35,7 +51,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('home');
   const [appState, setAppState] = useState<AppState>('idle');
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>('idle');
-  const [aiStatus, setAiStatus] = useState<string>('Idle (AI not loaded)');
+  const [aiStatus, setAiStatus] = useState<string>('Ready');
   const [voiceCmdStatus, setVoiceCmdStatus] = useState<string>('Disabled');
   const [powerSaverActive, setPowerSaverActive] = useState<boolean>(false);
   const [isOnline, setIsOnline] = useState<boolean>(() =>
@@ -123,11 +139,15 @@ export default function App() {
   }
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', settings.theme);
+    const root = document.documentElement;
+    root.setAttribute('data-theme', settings.theme);
+    root.setAttribute('data-text-size', settings.textSize);
+    root.setAttribute('data-reduced-motion', String(settings.reducedMotion));
     saveSettings(settings);
     voiceRef.current?.configure({
       rate: settings.speechRate,
       volume: settings.speechVolume,
+      speechAlertsEnabled: settings.speechAlertsEnabled,
       hapticsEnabled: settings.hapticsEnabled,
       spatialAudioEnabled: settings.spatialAudioEnabled,
       scanningTickEnabled: settings.scanningTickEnabled,
@@ -226,8 +246,8 @@ export default function App() {
     const canvas = overlayRef.current;
     const video = videoRef.current;
     if (!canvas || !video) return;
-    const w = video.clientWidth || 640;
-    const h = video.clientHeight || 480;
+    const w = video.clientWidth || 480;
+    const h = video.clientHeight || 360;
     if (canvas.width !== w || canvas.height !== h) {
       canvas.width = w;
       canvas.height = h;
@@ -237,22 +257,22 @@ export default function App() {
     ctx.clearRect(0, 0, w, h);
 
     ctx.lineWidth = 3;
-    ctx.font = 'bold 14px sans-serif';
+    ctx.font = 'bold 14px Commissioner, sans-serif';
     for (const det of detections) {
       const x = det.bbox.x1 * w;
       const y = det.bbox.y1 * h;
       const bw = (det.bbox.x2 - det.bbox.x1) * w;
       const bh = (det.bbox.y2 - det.bbox.y1) * h;
 
-      ctx.strokeStyle = '#22C55E';
+      ctx.strokeStyle = '#F7BC62';
       ctx.strokeRect(x, y, bw, bh);
 
       const label = `${det.spokenName} ${Math.round(det.confidence * 100)}%`;
       const textWidth = ctx.measureText(label).width;
-      ctx.fillStyle = '#020617';
-      ctx.fillRect(x, Math.max(0, y - 22), textWidth + 10, 22);
-      ctx.fillStyle = '#F8FAFC';
-      ctx.fillText(label, x + 5, Math.max(15, y - 6));
+      ctx.fillStyle = '#250C36';
+      ctx.fillRect(x, Math.max(0, y - 24), textWidth + 12, 24);
+      ctx.fillStyle = '#FFF8F3';
+      ctx.fillText(label, x + 6, Math.max(16, y - 7));
     }
   }, []);
 
@@ -278,7 +298,6 @@ export default function App() {
       let nextDelayMs = 45;
 
       try {
-        // Tier 1: Real-time GPU/MediaPipe reflex detection (~20-50 ms/frame).
         const fastResult = await fast.detectVideo(video, cur.minConfidence);
         if (fastResult && appStateRef.current === 'active') {
           setInferenceMs(fastResult.inferenceMs);
@@ -307,7 +326,6 @@ export default function App() {
           });
         }
 
-        // Tier 2: Non-blocking Cactus Mirage scene context enrichment (stairs/barriers/trees) every 4.5s.
         if (
           mirage?.isReady() &&
           !mirage.isBusy() &&
@@ -322,7 +340,6 @@ export default function App() {
               .detectFrame(frame.imageData, cur.minConfidence, frame.timestamp)
               .then((mRes) => {
                 if (!mRes || appStateRef.current !== 'active' || operationIdRef.current !== scanOpId) return;
-                // Keep static/context hazards from Mirage without duplicating Tier-1 dynamic boxes.
                 const sceneExtras = mRes.detections.filter(
                   (d) => d.classId === 'stairs' || d.classId === 'barrier' || d.classId === 'tree'
                 );
@@ -379,7 +396,7 @@ export default function App() {
     if (!step1.accepted) return;
     appStateRef.current = step1.nextState;
     setAppState(step1.nextState);
-    setAiStatus('Initializing real-time GPU detector...');
+    setAiStatus('Loading GPU detector...');
     voiceRef.current?.enqueue('AI is initializing.', 'P2');
 
     let tier1Summary = '';
@@ -391,7 +408,7 @@ export default function App() {
       if (opId !== operationIdRef.current || controller.signal.aborted) {
         return;
       }
-      setAiStatus(`Ready (${tier1Summary} • Loading Mirage...)`);
+      setAiStatus(`${tier1Summary}`);
       setModelCached(true);
     } catch (err) {
       if (opId !== operationIdRef.current || controller.signal.aborted) {
@@ -457,19 +474,14 @@ export default function App() {
     voiceRef.current?.speakImmediateSystem('Assistance started.');
     scheduleNextFrame();
 
-    // Initialize Cactus Mirage scene reader in the background without blocking startup.
     mirageRef.current
       ?.initialize(controller.signal)
       .then(({ modelName }) => {
         if (opId === operationIdRef.current && !controller.signal.aborted) {
-          setAiStatus(`Ready (${tier1Summary} + ${modelName})`);
+          setAiStatus(`${tier1Summary} + ${modelName}`);
         }
       })
-      .catch(() => {
-        if (opId === operationIdRef.current && !controller.signal.aborted) {
-          setAiStatus(`Ready (${tier1Summary})`);
-        }
-      });
+      .catch(() => {});
   }, [scheduleNextFrame, stopAssistance]);
 
   const speakCurrentSceneSummary = useCallback(() => {
@@ -491,7 +503,6 @@ export default function App() {
   stopRef.current = stopAssistance;
   summaryRef.current = speakCurrentSceneSummary;
 
-  // Offline hands-free voice commands via Cactus Whistle.
   useEffect(() => {
     if (!settings.onboardingCompleted || !settings.voiceCommandsEnabled) {
       micVadRef.current?.stop();
@@ -500,7 +511,7 @@ export default function App() {
     }
 
     const abort = new AbortController();
-    setVoiceCmdStatus('Loading Cactus Whistle...');
+    setVoiceCmdStatus('Loading Whistle...');
 
     mirageRef.current
       ?.initializeWhistle(abort.signal)
@@ -538,19 +549,19 @@ export default function App() {
                 voiceRef.current?.speakImmediateSystem('Speech rate decreased.');
               }
             } catch {
-              // Ignore single transcription failure without interrupting visual assistance.
+              // Ignore single transcription failure cleanly.
             }
           },
           () => voiceRef.current?.isSpeaking() ?? false
         );
         if (!abort.signal.aborted) {
-          setVoiceCmdStatus('Listening (Cactus Whistle)');
+          setVoiceCmdStatus('Listening (Whistle)');
         }
       })
       .catch((err) => {
         if (abort.signal.aborted) return;
-        const msg = err instanceof Error ? err.message : 'Voice commands unavailable.';
-        setVoiceCmdStatus(`Unavailable (${msg})`);
+        const msg = err instanceof Error ? err.message : 'Unavailable';
+        setVoiceCmdStatus(`Error (${msg})`);
       });
 
     return () => {
@@ -559,153 +570,391 @@ export default function App() {
     };
   }, [settings.onboardingCompleted, settings.voiceCommandsEnabled]);
 
-  const isRunning = appState === 'active' || appState === 'initializing_models' || appState === 'starting_camera';
+  const isDark = settings.theme === 'high-contrast-dark';
+  const isInitializing =
+    appState === 'initializing_models' || appState === 'starting_camera';
+  const isActive = appState === 'active';
+  const isRunning = isInitializing || isActive;
+
+  const toggleTheme = () => {
+    setSettings((prev) => ({
+      ...prev,
+      theme: prev.theme === 'high-contrast-dark' ? 'high-contrast-light' : 'high-contrast-dark',
+    }));
+  };
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="brand-row">
-          <img
-            src="/icons/drishti-icon.svg"
-            alt=""
-            width={44}
-            height={44}
-            aria-hidden="true"
-            style={{ borderRadius: 10 }}
-          />
-          <div>
-            <h1 className="brand-title">Drishti AI — दृष्टि</h1>
-            <p className="brand-tagline">See the path. Hear the world.</p>
-          </div>
-        </div>
-      </header>
-
       {!settings.onboardingCompleted ? (
-        <OnboardingView
-          onComplete={() => setSettings((prev) => ({ ...prev, onboardingCompleted: true }))}
-        />
+        <>
+          <header className="app-header">
+            <div className="brand-row">
+              <BrandMark size={36} />
+              <div>
+                <h1 className="brand-title">Drishti AI</h1>
+                <span className="brand-sub" lang="hi">
+                  दृष्टि
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="pill-btn"
+              onClick={toggleTheme}
+              aria-label="Switch Light or Dark theme"
+            >
+              {isDark ? <Sun size={18} weight="bold" /> : <Moon size={18} weight="bold" />}
+              <span>{isDark ? 'Ivory' : 'Dark'}</span>
+            </button>
+          </header>
+          <OnboardingView
+            onComplete={() => setSettings((prev) => ({ ...prev, onboardingCompleted: true }))}
+          />
+        </>
       ) : (
         <>
-          <nav className="nav-bar" aria-label="Main navigation">
-            <button
-              type="button"
-              className="nav-btn"
-              aria-current={tab === 'home' ? 'page' : undefined}
-              onClick={() => setTab('home')}
-            >
-              <House size={20} weight="bold" aria-hidden="true" />
-              <span>Home</span>
-            </button>
-            <button
-              type="button"
-              className="nav-btn"
-              aria-current={tab === 'settings' ? 'page' : undefined}
-              onClick={() => setTab('settings')}
-            >
-              <Sliders size={20} weight="bold" aria-hidden="true" />
-              <span>Settings</span>
-            </button>
-            <button
-              type="button"
-              className="nav-btn"
-              aria-current={tab === 'safety' ? 'page' : undefined}
-              onClick={() => setTab('safety')}
-            >
-              <ShieldWarning size={20} weight="bold" aria-hidden="true" />
-              <span>Safety</span>
-            </button>
-          </nav>
+          {/* Persistent hidden/visible video element kept mounted cleanly across camera startup & live loop */}
+          {!isRunning && (
+            <header className="app-header">
+              <div className="brand-row">
+                <BrandMark size={40} />
+                <div>
+                  <h1 className="brand-title">Drishti AI</h1>
+                  <span className="brand-sub" lang="hi">
+                    दृष्टि
+                  </span>
+                </div>
+              </div>
+              <div className="header-actions">
+                <button
+                  type="button"
+                  className="pill-btn"
+                  onClick={toggleTheme}
+                  aria-label="Switch Light or Dark theme"
+                >
+                  {isDark ? <Sun size={18} weight="bold" /> : <Moon size={18} weight="bold" />}
+                  <span>{isDark ? 'Ivory' : 'Dark'}</span>
+                </button>
+                <button
+                  type="button"
+                  className="icon-circle-btn"
+                  onClick={() => setTab('settings')}
+                  aria-label="Open Settings"
+                >
+                  <GearSix size={22} weight="bold" aria-hidden="true" />
+                </button>
+              </div>
+            </header>
+          )}
 
           {tab === 'home' && (
-            <main style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <main className="app-main">
               {errorBanner && (
-                <div className="alert-banner alert-banner--error" role="alert">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
-                    <WarningCircle size={22} weight="bold" aria-hidden="true" />
-                    <span>System Alert</span>
+                <div className="banner-error" role="alert">
+                  <WarningCircle
+                    size={22}
+                    weight="bold"
+                    color="var(--color-error)"
+                    style={{ flexShrink: 0, marginTop: 2 }}
+                    aria-hidden="true"
+                  />
+                  <div>
+                    <strong style={{ display: 'block' }}>System Alert</strong>
+                    <span style={{ fontSize: '0.92rem' }}>{errorBanner}</span>
                   </div>
-                  <p style={{ margin: '6px 0 0' }}>{errorBanner}</p>
                 </div>
               )}
 
-              {!isRunning ? (
-                <button
-                  type="button"
-                  className="primary-cta"
-                  onClick={startAssistance}
-                  aria-label="Start Navigation Assistance"
-                >
-                  <Play size={30} weight="fill" aria-hidden="true" />
-                  <span>Start Assistance</span>
-                </button>
-              ) : (
+              {/* Screen 04: Home Dashboard (Idle / Error) */}
+              {!isRunning && (
                 <>
-                  <button
-                    type="button"
-                    className="stop-cta"
-                    onClick={() => stopAssistance('Assistance stopped.')}
-                    aria-label="Stop Navigation Assistance"
-                  >
-                    <Stop size={30} weight="fill" aria-hidden="true" />
-                    <span>Stop Assistance</span>
-                  </button>
-                  {appState === 'active' && (
+                  <div>
+                    <h2 className="headline-page">Ready to explore?</h2>
+                    <p className="verified-line">
+                      <CheckCircle size={18} weight="bold" aria-hidden="true" />
+                      <span>All systems ready for on-device assistance</span>
+                    </p>
+                  </div>
+
+                  <section className="card-hero" aria-label="Start assistance">
+                    <div className="hero-orb">
+                      <Eye size={44} weight="bold" aria-hidden="true" />
+                    </div>
                     <button
                       type="button"
-                      className="secondary-btn"
-                      onClick={speakCurrentSceneSummary}
-                      aria-label="Describe what is ahead right now"
-                      style={{ minHeight: 56, fontSize: '1.05rem', fontWeight: 700 }}
+                      className="btn-primary-royal"
+                      onClick={startAssistance}
+                      aria-label="Start Navigation Assistance"
                     >
-                      What&apos;s Ahead? (Speak Obstacles)
+                      <PlayCircle size={28} weight="fill" aria-hidden="true" />
+                      <span>Start Assistance</span>
                     </button>
-                  )}
+                    <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--color-muted-foreground)' }}>
+                      Starts camera and on-device vision locally with spoken alerts.
+                    </p>
+                  </section>
+
+                  <StatusPanel
+                    cameraStatus={cameraStatus === 'idle' ? 'Ready' : cameraStatus}
+                    aiStatus={aiStatus}
+                    voiceStatus={voiceAvailability.ready ? 'Available' : voiceAvailability.statusLabel}
+                    voiceCommandStatus={voiceCmdStatus}
+                    isOnline={isOnline}
+                    modelCached={modelCached}
+                    onOpenOfflineStatus={() => setTab('offline')}
+                  />
+
+                  <p
+                    style={{
+                      margin: '2px 0 0',
+                      fontSize: '0.85rem',
+                      textAlign: 'center',
+                      color: 'var(--color-muted-foreground)',
+                    }}
+                  >
+                    Safety reminder: Continue using your white cane, guide dog, or mobility aid.
+                  </p>
                 </>
               )}
 
-              <div className="card" aria-live="polite" aria-atomic="true">
-                <div style={{ fontSize: '0.85rem', color: 'var(--color-muted-foreground)' }}>
-                  Latest Spoken Alert {inferenceMs !== null ? `• ${inferenceMs} ms/frame` : ''}
-                  {powerSaverActive ? ' • Stationary Battery Saver' : ''}
-                </div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 700, marginTop: 4 }}>
-                  {lastAlert
-                    ? `[${lastAlert.priority}] ${lastAlert.message}`
-                    : appState === 'active'
-                      ? 'Scanning path ahead...'
-                      : 'Press Start Assistance when ready.'}
-                </div>
-              </div>
+              {/* Screen 05: Initializing Assistance */}
+              {isInitializing && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 6 }}>
+                    <button
+                      type="button"
+                      className="icon-circle-btn"
+                      onClick={() => stopAssistance('Assistance cancelled.')}
+                      aria-label="Cancel and return Home"
+                    >
+                      <X size={22} weight="bold" aria-hidden="true" />
+                    </button>
+                    <h2 className="headline-page" style={{ fontSize: '1.45rem' }}>
+                      Starting Assistance
+                    </h2>
+                  </div>
 
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      textAlign: 'center',
+                      gap: 12,
+                      padding: '10px 0',
+                    }}
+                    aria-live="polite"
+                  >
+                    <div className="hero-orb hero-orb--gold">
+                      <HourglassHigh size={42} weight="bold" aria-hidden="true" />
+                    </div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '1.35rem', color: 'var(--color-primary)' }}>
+                        Preparing on-device vision
+                      </h3>
+                      <p style={{ margin: '4px 0 0', fontSize: '0.92rem', color: 'var(--color-muted-foreground)' }}>
+                        Loading local models on your device. No frames leave your phone.
+                      </p>
+                    </div>
+                  </div>
+
+                  <section className="status-list" aria-label="Initialization stages">
+                    <div
+                      className={`status-row ${
+                        appState === 'initializing_models' ? 'status-row--active' : 'status-row--ready'
+                      }`}
+                    >
+                      <div className="status-row-left">
+                        <Cpu size={22} weight="bold" aria-hidden="true" />
+                        <span>Loading vision engine</span>
+                      </div>
+                      <span className="status-row-right">
+                        {appState === 'initializing_models' ? 'In progress' : 'Complete'}
+                      </span>
+                    </div>
+
+                    <div
+                      className={`status-row ${
+                        appState === 'starting_camera' ? 'status-row--active' : ''
+                      }`}
+                    >
+                      <div className="status-row-left">
+                        <Camera size={22} weight="bold" aria-hidden="true" />
+                        <span>Starting rear camera</span>
+                      </div>
+                      <span className="status-row-right">
+                        {appState === 'starting_camera' ? 'In progress' : 'Waiting'}
+                      </span>
+                    </div>
+
+                    <div className="status-row">
+                      <div className="status-row-left">
+                        <SpeakerHigh size={22} weight="bold" aria-hidden="true" />
+                        <span>Preparing audio alerts</span>
+                      </div>
+                      <span className="status-row-right status-row-right--muted">
+                        {voiceAvailability.ready ? 'Ready' : 'Waiting'}
+                      </span>
+                    </div>
+                  </section>
+
+                  <button
+                    type="button"
+                    className="btn-secondary-ivory"
+                    onClick={() => stopAssistance('Assistance cancelled.')}
+                  >
+                    Cancel
+                  </button>
+                </>
+              )}
+
+              {/* Screens 06 & 07: Live Assistance */}
+              {isActive && (
+                <>
+                  <header
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                      paddingTop: 4,
+                    }}
+                  >
+                    <div className="badge-pill badge-jade">
+                      <RadioButton size={18} weight="fill" aria-hidden="true" />
+                      <span>Assistance Active</span>
+                    </div>
+                    <span className="font-mono" style={{ fontSize: '0.85rem', color: 'var(--color-muted-foreground)' }}>
+                      {inferenceMs !== null ? `${inferenceMs} ms/frame` : 'Warming up'}
+                      {powerSaverActive ? ' • Saver' : ''}
+                    </span>
+                  </header>
+
+                  <section
+                    style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}
+                    aria-label="Active system status"
+                  >
+                    <div className="status-row" style={{ padding: '10px 12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--color-muted-foreground)' }}>
+                          Camera
+                        </span>
+                        <span style={{ fontWeight: 700, color: 'var(--color-secondary)' }}>
+                          Active
+                        </span>
+                      </div>
+                      <Camera size={20} weight="bold" color="var(--color-secondary)" aria-hidden="true" />
+                    </div>
+                    <div className="status-row" style={{ padding: '10px 12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--color-muted-foreground)' }}>
+                          Vision AI
+                        </span>
+                        <span style={{ fontWeight: 700, color: 'var(--color-secondary)' }}>
+                          Running
+                        </span>
+                      </div>
+                      <Cpu size={20} weight="bold" color="var(--color-secondary)" aria-hidden="true" />
+                    </div>
+                  </section>
+
+                  <section
+                    aria-live="polite"
+                    role="status"
+                    className={`card-elevated ${lastAlert ? '' : 'card-elevated--jade'}`}
+                    style={{ flex: 1, justifyContent: 'center', minHeight: 170 }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        color: lastAlert ? 'var(--color-tertiary)' : 'var(--color-secondary)',
+                        fontWeight: 600,
+                        fontSize: '0.92rem',
+                      }}
+                    >
+                      <Megaphone size={20} weight="bold" aria-hidden="true" />
+                      <span>{lastAlert ? `Last spoken alert [${lastAlert.priority}]` : 'Scanning surroundings'}</span>
+                    </div>
+                    <h2 className="headline-page" style={{ fontSize: '1.85rem' }}>
+                      {lastAlert ? lastAlert.message : 'Scanning path ahead...'}
+                    </h2>
+                    <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--color-muted-foreground)' }}>
+                      Audio guidance is primary. Keep your phone steady alongside your white cane.
+                    </p>
+                  </section>
+
+                  <button
+                    type="button"
+                    className="btn-secondary-ivory"
+                    onClick={speakCurrentSceneSummary}
+                    aria-label="Describe what is ahead right now"
+                  >
+                    <SpeakerHigh size={20} weight="bold" aria-hidden="true" />
+                    <span>What&apos;s Ahead? (Speak Obstacles)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="status-row"
+                    aria-expanded={settings.showCameraPreview}
+                    onClick={() =>
+                      setSettings((prev) => ({
+                        ...prev,
+                        showCameraPreview: !prev.showCameraPreview,
+                      }))
+                    }
+                  >
+                    <span className="status-row-left" style={{ fontSize: '0.9rem' }}>
+                      {settings.showCameraPreview ? (
+                        <Eye size={18} weight="bold" aria-hidden="true" />
+                      ) : (
+                        <EyeSlash size={18} weight="bold" aria-hidden="true" />
+                      )}
+                      <span>
+                        {settings.showCameraPreview
+                          ? 'Hide camera preview'
+                          : 'Camera preview minimized (recommended)'}
+                      </span>
+                    </span>
+                    {settings.showCameraPreview ? (
+                      <CaretUp size={18} weight="bold" aria-hidden="true" />
+                    ) : (
+                      <CaretDown size={18} weight="bold" aria-hidden="true" />
+                    )}
+                  </button>
+                </>
+              )}
+
+              {/* Video stays mounted during starting_camera & active so CameraManager always binds cleanly */}
               <div
                 className="camera-stage"
                 style={{
-                  display: settings.showCameraPreview ? 'block' : 'none',
+                  display: isActive && settings.showCameraPreview ? 'block' : 'none',
                 }}
               >
                 <video ref={videoRef} className="camera-video" playsInline muted />
                 <canvas ref={overlayRef} className="camera-overlay" aria-hidden="true" />
               </div>
 
-              {appState === 'active' && liveDetections.length > 0 && (
+              {isActive && liveDetections.length > 0 && (
                 <div className="sr-only" aria-live="off">
                   {liveDetections.length} objects currently in view.
                 </div>
               )}
 
-              <StatusPanel
-                cameraStatus={cameraStatus}
-                aiStatus={aiStatus}
-                voiceStatus={voiceAvailability.statusLabel}
-                voiceCommandStatus={voiceCmdStatus}
-                isOnline={isOnline}
-                modelCached={modelCached}
-              />
-
-              <div className="alert-banner alert-banner--warning" role="note">
-                <strong>Experimental Assistive Tool:</strong> Use alongside your white cane or guide
-                dog. Never rely on this app for street-crossing decisions.
-              </div>
+              {isActive && (
+                <button
+                  type="button"
+                  className="btn-stop-crimson"
+                  onClick={() => stopAssistance('Assistance stopped.')}
+                  aria-label="Stop Navigation Assistance"
+                >
+                  <StopCircle size={28} weight="fill" aria-hidden="true" />
+                  <span>Stop Assistance</span>
+                </button>
+              )}
             </main>
           )}
 
@@ -716,6 +965,15 @@ export default function App() {
               onTestVoice={() =>
                 voiceRef.current?.speakImmediateSystem('Drishti AI voice test. Obstacle ahead.')
               }
+              onOpenOfflineStatus={() => setTab('offline')}
+              modelCached={modelCached}
+            />
+          )}
+
+          {tab === 'offline' && (
+            <OfflineStatusView
+              isOnline={isOnline}
+              modelCached={modelCached}
               onClearModelCache={async () => {
                 if (!isRunning) {
                   fastDetectorRef.current?.terminate();
@@ -725,11 +983,46 @@ export default function App() {
                 setModelCached(false);
                 setAiStatus('Cache cleared');
               }}
-              modelCached={modelCached}
+              onBack={() => setTab('home')}
             />
           )}
 
           {tab === 'safety' && <SafetyView />}
+
+          {/* Stitch 3-Destination Bottom Navigation Bar */}
+          {!isRunning && (
+            <nav className="bottom-nav" aria-label="Main navigation">
+              <div className="bottom-nav-grid">
+                <button
+                  type="button"
+                  className="bottom-nav-btn"
+                  aria-current={tab === 'home' || tab === 'offline' ? 'page' : undefined}
+                  onClick={() => setTab('home')}
+                >
+                  <House size={22} weight={tab === 'home' ? 'fill' : 'bold'} aria-hidden="true" />
+                  <span>Home</span>
+                </button>
+                <button
+                  type="button"
+                  className="bottom-nav-btn"
+                  aria-current={tab === 'settings' ? 'page' : undefined}
+                  onClick={() => setTab('settings')}
+                >
+                  <GearSix size={22} weight={tab === 'settings' ? 'fill' : 'bold'} aria-hidden="true" />
+                  <span>Settings</span>
+                </button>
+                <button
+                  type="button"
+                  className="bottom-nav-btn"
+                  aria-current={tab === 'safety' ? 'page' : undefined}
+                  onClick={() => setTab('safety')}
+                >
+                  <Question size={22} weight={tab === 'safety' ? 'fill' : 'bold'} aria-hidden="true" />
+                  <span>Help</span>
+                </button>
+              </div>
+            </nav>
+          )}
         </>
       )}
     </div>

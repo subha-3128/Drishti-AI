@@ -12,8 +12,8 @@ export default defineConfig({
         name: 'Drishti AI — दृष्टि',
         short_name: 'Drishti AI',
         description: 'See the path. Hear the world. Offline-capable assistive navigation powered by Cactus Mirage.',
-        theme_color: '#0369A1',
-        background_color: '#0F172A',
+        theme_color: '#250C36',
+        background_color: '#FFF8F3',
         display: 'standalone',
         orientation: 'portrait',
         icons: [

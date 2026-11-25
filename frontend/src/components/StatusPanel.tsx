@@ -1,4 +1,13 @@
-import { Camera, Cpu, Microphone, SpeakerHigh, WifiSlash, WifiHigh } from '@phosphor-icons/react';
+import {
+  Camera,
+  CaretRight,
+  CheckCircle,
+  Cpu,
+  Microphone,
+  SpeakerHigh,
+  WifiHigh,
+  WifiSlash,
+} from '@phosphor-icons/react';
 
 export interface SystemStatusProps {
   cameraStatus: string;
@@ -7,6 +16,7 @@ export interface SystemStatusProps {
   voiceCommandStatus: string;
   isOnline: boolean;
   modelCached: boolean;
+  onOpenOfflineStatus?: () => void;
 }
 
 export function StatusPanel({
@@ -16,54 +26,72 @@ export function StatusPanel({
   voiceCommandStatus,
   isOnline,
   modelCached,
+  onOpenOfflineStatus,
 }: SystemStatusProps) {
   return (
-    <section aria-label="System Status" className="status-grid">
-      <div className="status-item">
-        <div className="status-label">
-          <Camera size={18} weight="bold" aria-hidden="true" />
+    <section aria-label="System Status" className="status-list">
+      <div className="status-row">
+        <div className="status-row-left">
+          <Camera size={22} weight="bold" color="var(--color-secondary)" aria-hidden="true" />
           <span>Camera</span>
         </div>
-        <div className="status-value">{cameraStatus}</div>
+        <span className="status-row-right">
+          <CheckCircle size={18} weight="bold" aria-hidden="true" />
+          <span>{cameraStatus}</span>
+        </span>
       </div>
 
-      <div className="status-item">
-        <div className="status-label">
-          <Cpu size={18} weight="bold" aria-hidden="true" />
-          <span>AI Detector</span>
+      <div className="status-row">
+        <div className="status-row-left">
+          <Cpu size={22} weight="bold" color="var(--color-secondary)" aria-hidden="true" />
+          <span>Vision Engine</span>
         </div>
-        <div className="status-value">{aiStatus}</div>
+        <span className="status-row-right">{aiStatus}</span>
       </div>
 
-      <div className="status-item">
-        <div className="status-label">
-          <SpeakerHigh size={18} weight="bold" aria-hidden="true" />
-          <span>Voice Output</span>
+      <div className="status-row">
+        <div className="status-row-left">
+          <SpeakerHigh size={22} weight="bold" color="var(--color-secondary)" aria-hidden="true" />
+          <span>Audio Alerts</span>
         </div>
-        <div className="status-value">{voiceStatus}</div>
+        <span className="status-row-right">{voiceStatus}</span>
       </div>
 
-      <div className="status-item">
-        <div className="status-label">
-          <Microphone size={18} weight="bold" aria-hidden="true" />
+      <div className="status-row">
+        <div className="status-row-left">
+          <Microphone size={22} weight="bold" color="var(--color-secondary)" aria-hidden="true" />
           <span>Voice Commands</span>
         </div>
-        <div className="status-value">{voiceCommandStatus}</div>
+        <span
+          className={`status-row-right ${
+            voiceCommandStatus === 'Disabled' ? 'status-row-right--muted' : ''
+          }`}
+        >
+          {voiceCommandStatus}
+        </span>
       </div>
 
-      <div className="status-item">
-        <div className="status-label">
+      <button
+        type="button"
+        className="status-row"
+        onClick={onOpenOfflineStatus}
+        aria-label="Open Model and Offline Status details"
+      >
+        <div className="status-row-left">
           {isOnline ? (
-            <WifiHigh size={18} weight="bold" aria-hidden="true" />
+            <WifiHigh size={22} weight="bold" color="var(--color-secondary)" aria-hidden="true" />
           ) : (
-            <WifiSlash size={18} weight="bold" aria-hidden="true" />
+            <WifiSlash size={22} weight="bold" color="var(--color-tertiary)" aria-hidden="true" />
           )}
-          <span>Offline Readiness</span>
+          <span>Offline Mode</span>
         </div>
-        <div className="status-value">
-          {isOnline ? 'Online' : 'Offline'} • {modelCached ? 'Model Cached' : 'Model Not Cached'}
-        </div>
-      </div>
+        <span className="status-row-right">
+          <span>
+            {isOnline ? 'Online' : 'Offline'} • {modelCached ? 'Cached' : 'Ready'}
+          </span>
+          <CaretRight size={18} weight="bold" color="var(--color-muted-foreground)" aria-hidden="true" />
+        </span>
+      </button>
     </section>
   );
 }
