@@ -193,7 +193,7 @@ self.onmessage = async (event: MessageEvent<MirageWorkerRequest>) => {
         sections: ['objects'],
         fields: ['bbox', 'score'],
         conf: msg.minConfidence,
-        max_objects: 10,
+        max_objects: 5,
       });
 
       const code = cactusMod.ccall(

@@ -23,8 +23,8 @@
 - [x] **Milestone 6:** Offline PWA (`vite-plugin-pwa`, 18 entries / ~39 MB precache) + Capacitor Android project (`frontend/android/`)
 - [x] **Milestone 7:** Dataset evaluation harness (`evaluate_mirage.mjs`), Python validator tests, Vitest suite, and GitHub Actions CI
 
-## Known Limitations & Unverified Items
-- **Mirage Inference Latency:** Measured **~976 ms median** (~1 FPS) in Node WASM; physical Android device benchmarks and thermal endurance remain unverified.
+## Known Limitations & Verified Device Metrics
+- **Mirage Inference Latency:** Measured **~976 ms median** in Node WASM (Apple Silicon) and **2,500+ ms/frame** on a physical Android phone (`I2127`, Qualcomm Snapdragon 4 Gen 1 `holi`, Chrome single-threaded WASM). Achieving <500 ms on mobile requires switching from single-threaded browser WASM to a Capacitor JNI bridge calling native `releases/4.1.4/android-arm64/libcactus.a` across multiple threads.
 - **APK Compilation:** Requires Android SDK / Android Studio locally (`./gradlew assembleDebug`) because Android SDK tools are not installed on this machine.
 - **PWA Background/Screen-Lock:** Browser PWA mode pauses camera when backgrounded or screen-locked; native foreground background-camera mode requires a Capacitor Foreground Service plugin when compiling on Android.
 - **Indian Hazards:** No Indian pedestrian hazard dataset evaluated yet; custom Indian hazard classes (`pothole`, `open_drain`, `open_manhole`, `broken_footpath`, `auto_rickshaw`) remain disabled (`enabled: false`).
