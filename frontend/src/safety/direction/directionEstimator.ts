@@ -32,11 +32,11 @@ export function estimateDirection(bbox: NormalizedBBox, confidence: number): Haz
 export function formatDirectionPhrase(direction: HazardDirection): string {
   switch (direction) {
     case 'left':
-      return 'on your left';
+      return 'left';
     case 'right':
-      return 'on your right';
+      return 'right';
     case 'center':
-      return 'ahead, center';
+      return 'center ahead';
     case 'ahead':
     default:
       return 'ahead';

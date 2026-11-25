@@ -13,10 +13,10 @@ describe('Direction Estimator', () => {
     expect(estimateDirection({ x1: 0.05, y1: 0.2, x2: 0.8, y2: 0.9 }, 0.9)).toBe('ahead');
   });
 
-  it('formats concise spoken direction phrases', () => {
-    expect(formatDirectionPhrase('left')).toBe('on your left');
-    expect(formatDirectionPhrase('right')).toBe('on your right');
-    expect(formatDirectionPhrase('center')).toBe('ahead, center');
+  it('formats crisp spoken direction phrases for fast walking alerts', () => {
+    expect(formatDirectionPhrase('left')).toBe('left');
+    expect(formatDirectionPhrase('right')).toBe('right');
+    expect(formatDirectionPhrase('center')).toBe('center ahead');
     expect(formatDirectionPhrase('ahead')).toBe('ahead');
   });
 });

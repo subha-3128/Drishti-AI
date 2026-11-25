@@ -13,25 +13,25 @@ describe('Adaptive Frame Scheduler', () => {
     ).toBeGreaterThanOrEqual(2000);
   });
 
-  it('stays fast when an urgent hazard is present even if stationary', () => {
+  it('stays responsive when an urgent hazard is present even if stationary', () => {
     expect(
       computeNextFrameDelayMs({
-        inferenceMs: 1800,
+        inferenceMs: 2500,
         isStationary: true,
         hasUrgentHazard: true,
         batterySaverEnabled: true,
       })
-    ).toBe(120);
+    ).toBe(60);
   });
 
-  it('applies thermal backoff when Mirage inference latency spikes', () => {
+  it('minimizes inter-frame idle wait when moving on slower mobile CPUs', () => {
     expect(
       computeNextFrameDelayMs({
-        inferenceMs: 1800,
+        inferenceMs: 2500,
         isStationary: false,
         hasUrgentHazard: false,
         batterySaverEnabled: true,
       })
-    ).toBe(650);
+    ).toBe(60);
   });
 });

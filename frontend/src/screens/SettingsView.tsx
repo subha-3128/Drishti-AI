@@ -132,6 +132,18 @@ export function SettingsView({
         <label style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <input
             type="checkbox"
+            checked={settings.scanningTickEnabled}
+            onChange={(e) => onChange({ ...settings, scanningTickEnabled: e.target.checked })}
+            style={{ width: 22, height: 22 }}
+          />
+          <span>Play subtle heartbeat tick on each scan (confirms camera is active)</span>
+        </label>
+      </div>
+
+      <div className="setting-row">
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <input
+            type="checkbox"
             checked={settings.batterySaverEnabled}
             onChange={(e) => onChange({ ...settings, batterySaverEnabled: e.target.checked })}
             style={{ width: 22, height: 22 }}

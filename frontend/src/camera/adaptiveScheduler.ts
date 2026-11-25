@@ -5,12 +5,13 @@ export interface AdaptiveFrameParams {
   batterySaverEnabled: boolean;
 }
 
-const MIN_DELAY_MS = 120;
-const BASE_DELAY_MS = 150;
+const MIN_DELAY_MS = 60;
+const BASE_DELAY_MS = 140;
 const STATIONARY_DELAY_MS = 2200;
 
 /**
- * Computes inter-frame delay to balance pedestrian responsiveness against mobile CPU thermal load and battery drain.
+ * Computes inter-frame delay to maximize walking responsiveness on slower mobile devices
+ * while still dialing down cadence when standing still with battery saver enabled.
  */
 export function computeNextFrameDelayMs(params: AdaptiveFrameParams): number {
   if (params.hasUrgentHazard) {
@@ -19,11 +20,9 @@ export function computeNextFrameDelayMs(params: AdaptiveFrameParams): number {
   if (params.batterySaverEnabled && params.isStationary) {
     return STATIONARY_DELAY_MS;
   }
-  if (params.inferenceMs > 1600) {
-    return 650;
-  }
   if (params.inferenceMs > 1200) {
-    return 320;
+    // Yield briefly for UI/TTS events without adding hundreds of ms of extra blind wait time.
+    return MIN_DELAY_MS;
   }
   return BASE_DELAY_MS;
 }

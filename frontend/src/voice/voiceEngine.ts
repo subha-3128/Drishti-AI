@@ -51,6 +51,7 @@ export class VoiceEngine {
   private volume = 1.0;
   private hapticsEnabled = true;
   private spatialAudioEnabled = true;
+  private scanningTickEnabled = true;
   private availabilityListeners = new Set<(avail: VoiceAvailability) => void>();
   private boundOnVoicesChanged: (() => void) | null = null;
 
@@ -123,12 +124,45 @@ export class VoiceEngine {
     volume?: number;
     hapticsEnabled?: boolean;
     spatialAudioEnabled?: boolean;
+    scanningTickEnabled?: boolean;
   }): void {
     if (typeof options.rate === 'number') this.rate = options.rate;
     if (typeof options.volume === 'number') this.volume = options.volume;
     if (typeof options.hapticsEnabled === 'boolean') this.hapticsEnabled = options.hapticsEnabled;
     if (typeof options.spatialAudioEnabled === 'boolean') {
       this.spatialAudioEnabled = options.spatialAudioEnabled;
+    }
+    if (typeof options.scanningTickEnabled === 'boolean') {
+      this.scanningTickEnabled = options.scanningTickEnabled;
+    }
+  }
+
+  /**
+   * Subtle 25 ms heartbeat pulse confirming the camera/AI loop is active without claiming safety.
+   */
+  playScanningTick(): void {
+    if (!this.scanningTickEnabled || this.isSpeaking() || typeof window === 'undefined') return;
+    const Ctor =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctor) return;
+    try {
+      if (!this.audioCtx) this.audioCtx = new Ctor();
+      if (this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume().catch(() => {});
+      }
+      const now = this.audioCtx.currentTime;
+      const osc = this.audioCtx.createOscillator();
+      const gain = this.audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(420, now);
+      gain.gain.setValueAtTime(Math.max(0.01, this.volume * 0.03), now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
+      osc.connect(gain).connect(this.audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.03);
+    } catch {
+      // Ignore AudioContext restriction errors cleanly.
     }
   }
 

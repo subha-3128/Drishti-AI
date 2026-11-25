@@ -1,0 +1,25 @@
+# Drishti AI — Indian Pedestrian Hazard Dataset Schema
+# Use with ai-training/scripts/validate_yolo_dataset.py (--num-classes 16)
+
+path: ./dataset
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: person
+  1: crowd
+  2: vehicle
+  3: auto_rickshaw
+  4: motorcycle
+  5: bicycle
+  6: bus
+  7: truck
+  8: dog
+  9: cow
+  10: stairs
+  11: barrier
+  12: pothole
+  13: open_drain
+  14: open_manhole
+  15: open_door

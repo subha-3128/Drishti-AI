@@ -12,18 +12,28 @@ describe('Hazard Engine', () => {
     bbox: { x1: 0.05, y1: 0.3, x2: 0.25, y2: 0.8 },
   };
 
-  it('requires temporal validation across frames for non-immediate hazards', () => {
+  const lowConfBarrierSide: MirageDetection = {
+    id: 10,
+    rawLabel: 'barrier',
+    classId: 'barrier',
+    spokenName: 'Barrier',
+    confidence: 0.48,
+    bbox: { x1: 0.75, y1: 0.5, x2: 0.9, y2: 0.7 },
+  };
+
+  it('requires temporal validation for low-confidence side obstacles but alerts immediately for high-confidence dynamic hazards', () => {
     const engine = new HazardEngine({ minConfidence: 0.4, cooldownMs: 4000 });
-    expect(engine.processDetections([personLeft], 1000)).toHaveLength(0);
-    const second = engine.processDetections([personLeft], 1400);
-    expect(second).toHaveLength(1);
-    expect(second[0].message).toBe('Person on your left.');
+    expect(engine.processDetections([lowConfBarrierSide], 1000)).toHaveLength(0);
+    expect(engine.processDetections([lowConfBarrierSide], 1400)).toHaveLength(1);
+
+    const immediate = engine.processDetections([personLeft], 2000);
+    expect(immediate).toHaveLength(1);
+    expect(immediate[0].message).toBe('Person left.');
   });
 
   it('suppresses repeated alerts within the cooldown window', () => {
     const engine = new HazardEngine({ minConfidence: 0.4, cooldownMs: 4000 });
-    engine.processDetections([personLeft], 1000);
-    expect(engine.processDetections([personLeft], 1400)).toHaveLength(1);
+    expect(engine.processDetections([personLeft], 1000)).toHaveLength(1);
     expect(engine.processDetections([personLeft], 2500)).toHaveLength(0);
     expect(engine.processDetections([personLeft], 3800)).toHaveLength(0);
     expect(engine.processDetections([personLeft], 5600)).toHaveLength(1);
@@ -44,7 +54,7 @@ describe('Hazard Engine', () => {
       rawLabel: 'barrier',
       classId: 'barrier',
       spokenName: 'Barrier',
-      confidence: 0.75,
+      confidence: 0.55,
       bbox: { x1: 0.75, y1: 0.5, x2: 0.9, y2: 0.7 },
     };
 

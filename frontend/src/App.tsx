@@ -121,6 +121,7 @@ export default function App() {
       volume: settings.speechVolume,
       hapticsEnabled: settings.hapticsEnabled,
       spatialAudioEnabled: settings.spatialAudioEnabled,
+      scanningTickEnabled: settings.scanningTickEnabled,
     });
     hazardEngineRef.current?.updateOptions({
       minConfidence: settings.minConfidence,
@@ -271,6 +272,8 @@ export default function App() {
                 for (const alert of alerts) {
                   voiceRef.current?.enqueue(alert.message, alert.priority, alert.direction);
                 }
+              } else {
+                voiceRef.current?.playScanningTick();
               }
 
               const stationary = motionRef.current?.isStationary() ?? false;
@@ -412,10 +415,24 @@ export default function App() {
     scheduleNextFrame();
   }, [scheduleNextFrame, stopAssistance]);
 
+  const speakCurrentSceneSummary = useCallback(() => {
+    const top = liveDetectionsRef.current.slice(0, 3);
+    if (top.length === 0) {
+      voiceRef.current?.speakImmediateSystem('No obstacles currently in view.');
+      return;
+    }
+    const summary = top
+      .map((d) => `${d.spokenName} ${formatDirectionPhrase(estimateDirection(d.bbox, d.confidence))}`)
+      .join(', ');
+    voiceRef.current?.speakImmediateSystem(`In view: ${summary}.`);
+  }, []);
+
   const startRef = useRef(startAssistance);
   const stopRef = useRef(stopAssistance);
+  const summaryRef = useRef(speakCurrentSceneSummary);
   startRef.current = startAssistance;
   stopRef.current = stopAssistance;
+  summaryRef.current = speakCurrentSceneSummary;
 
   // Offline hands-free voice commands via Cactus Whistle.
   useEffect(() => {
@@ -449,15 +466,7 @@ export default function App() {
                   lastAlertRef.current?.message ?? 'No recent alert.'
                 );
               } else if (cmd === 'ahead') {
-                const top = liveDetectionsRef.current.slice(0, 3);
-                if (top.length === 0) {
-                  voiceRef.current?.speakImmediateSystem('No obstacles currently in view.');
-                } else {
-                  const summary = top
-                    .map((d) => `${d.spokenName} ${formatDirectionPhrase(estimateDirection(d.bbox, d.confidence))}`)
-                    .join(', ');
-                  voiceRef.current?.speakImmediateSystem(`In view: ${summary}.`);
-                }
+                summaryRef.current();
               } else if (cmd === 'faster') {
                 setSettings((prev) => ({
                   ...prev,
@@ -573,15 +582,28 @@ export default function App() {
                   <span>Start Assistance</span>
                 </button>
               ) : (
-                <button
-                  type="button"
-                  className="stop-cta"
-                  onClick={() => stopAssistance('Assistance stopped.')}
-                  aria-label="Stop Navigation Assistance"
-                >
-                  <Stop size={30} weight="fill" aria-hidden="true" />
-                  <span>Stop Assistance</span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="stop-cta"
+                    onClick={() => stopAssistance('Assistance stopped.')}
+                    aria-label="Stop Navigation Assistance"
+                  >
+                    <Stop size={30} weight="fill" aria-hidden="true" />
+                    <span>Stop Assistance</span>
+                  </button>
+                  {appState === 'active' && (
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      onClick={speakCurrentSceneSummary}
+                      aria-label="Describe what is ahead right now"
+                      style={{ minHeight: 56, fontSize: '1.05rem', fontWeight: 700 }}
+                    >
+                      What&apos;s Ahead? (Speak Obstacles)
+                    </button>
+                  )}
+                </>
               )}
 
               <div className="card" aria-live="polite" aria-atomic="true">

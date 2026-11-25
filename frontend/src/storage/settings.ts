@@ -5,6 +5,7 @@ export interface DrishtiSettings {
   speechVolume: number;
   hapticsEnabled: boolean;
   spatialAudioEnabled: boolean;
+  scanningTickEnabled: boolean;
   batterySaverEnabled: boolean;
   voiceCommandsEnabled: boolean;
   minConfidence: number;
@@ -19,6 +20,7 @@ export const DEFAULT_SETTINGS: DrishtiSettings = {
   speechVolume: 1.0,
   hapticsEnabled: true,
   spatialAudioEnabled: true,
+  scanningTickEnabled: true,
   batterySaverEnabled: true,
   voiceCommandsEnabled: false,
   minConfidence: 0.4,
@@ -40,6 +42,7 @@ export function loadSettings(): DrishtiSettings {
       speechVolume: clampNumber(parsed.speechVolume, 0.2, 1.0, DEFAULT_SETTINGS.speechVolume),
       hapticsEnabled: boolOr(parsed.hapticsEnabled, DEFAULT_SETTINGS.hapticsEnabled),
       spatialAudioEnabled: boolOr(parsed.spatialAudioEnabled, DEFAULT_SETTINGS.spatialAudioEnabled),
+      scanningTickEnabled: boolOr(parsed.scanningTickEnabled, DEFAULT_SETTINGS.scanningTickEnabled),
       batterySaverEnabled: boolOr(parsed.batterySaverEnabled, DEFAULT_SETTINGS.batterySaverEnabled),
       voiceCommandsEnabled: boolOr(parsed.voiceCommandsEnabled, DEFAULT_SETTINGS.voiceCommandsEnabled),
       minConfidence: clampNumber(parsed.minConfidence, 0.25, 0.85, DEFAULT_SETTINGS.minConfidence),

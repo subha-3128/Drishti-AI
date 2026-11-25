@@ -98,7 +98,7 @@ export class CameraManager {
           facingMode: { ideal: 'environment' },
           width: { ideal: TARGET_WIDTH },
           height: { ideal: TARGET_HEIGHT },
-          frameRate: { ideal: 15, max: 24 },
+          frameRate: { ideal: 10, max: 15 },
         },
       });
 

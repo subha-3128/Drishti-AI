@@ -48,7 +48,7 @@ export class HazardEngine {
     this.options = {
       minConfidence: options.minConfidence,
       cooldownMs: options.cooldownMs,
-      trackExpiryMs: options.trackExpiryMs ?? 5000,
+      trackExpiryMs: options.trackExpiryMs ?? 7500,
     };
   }
 
@@ -86,14 +86,15 @@ export class HazardEngine {
       const direction = estimateDirection(det.bbox, det.confidence);
       const priority = this.computePriority(cfg.basePriority, det.bbox, direction, area);
 
-      // Temporal validation: require >=2 observations unless large obstacle directly in close walking path.
-      const immediateClosePath =
-        (direction === 'center' || direction === 'ahead') &&
-        area >= 0.25 &&
-        det.bbox.y2 >= 0.8 &&
-        det.confidence >= 0.65;
+      const inPath = direction === 'center' || direction === 'ahead';
+      const immediateClosePath = inPath && area >= 0.25 && det.bbox.y2 >= 0.8 && det.confidence >= 0.65;
+      // Avoid 2.5s+ mobile blind spots by alerting immediately on high-confidence dynamic/path obstacles.
+      const singleFrameHighConf =
+        det.confidence >= 0.65 &&
+        area >= 0.045 &&
+        (cfg.category === 'dynamic' || det.classId === 'stairs' || (cfg.category === 'static' && inPath));
 
-      if (track.seenCount < 2 && !immediateClosePath) {
+      if (track.seenCount < 2 && !immediateClosePath && !singleFrameHighConf) {
         continue;
       }
 

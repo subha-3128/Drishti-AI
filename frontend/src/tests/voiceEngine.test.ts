@@ -78,6 +78,7 @@ describe('Voice Engine', () => {
     const engine = new VoiceEngine();
     engine.enqueue('Vehicle on your left.', 'P1', 'left');
     expect(panSet).toHaveBeenCalledWith(-0.85, 0);
+    engine.playScanningTick();
   });
 
   it('preempts lower-priority speech when a P0 critical alert arrives', () => {
