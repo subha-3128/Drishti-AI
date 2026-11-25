@@ -26,8 +26,10 @@ describe('Mirage Adapter & Registry', () => {
   it('keeps unvalidated Indian road hazards disabled and handles plural labels', () => {
     expect(mapMirageLabel('pothole')).toBeNull();
     expect(mapMirageLabel('open drain')).toBeNull();
+    expect(mapMirageLabel('manhole')).toBeNull();
     expect(mapMirageLabel('broken footpath')).toBeNull();
     expect(mapMirageLabel('stairs')?.id).toBe('stairs');
+    expect(mapMirageLabel('trash can')?.id).toBe('obstacle');
     expect(mapMirageLabel('cars')?.id).toBe('vehicle');
     expect(mapMirageLabel('dogs')?.id).toBe('dog');
     expect(mapMirageLabel('trees')?.id).toBe('tree');

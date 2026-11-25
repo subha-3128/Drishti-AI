@@ -1,0 +1,35 @@
+# ROD-Dataset: Real-Time Obstacle Detection (MIT License)
+# Source: https://huggingface.co/datasets/Abtinzandi/Obstacle-Detection-Dataset-YOLO
+
+path: ./rod_dataset
+train: train/images
+val: valid/images
+test: test/images
+
+nc: 25
+names:
+  0: Bike
+  1: Building
+  2: Car
+  3: Person
+  4: Stairs
+  5: Traffic sign
+  6: Electrical Pole
+  7: Road
+  8: Motorcycle
+  9: Dustbin
+  10: Dog
+  11: Manhole
+  12: Tree
+  13: Guard rail
+  14: Pedestrian crosswalk
+  15: Truck
+  16: Bus
+  17: Bench
+  18: Traffic Cone
+  19: Fire hydrant
+  20: Traffic Barrel
+  21: Plant Pot
+  22: Electrical Box
+  23: Chair
+  24: Bicycle Rack

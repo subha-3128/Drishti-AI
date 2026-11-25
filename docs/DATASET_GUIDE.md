@@ -4,6 +4,7 @@
 The bundled `mirage.cact` vision model supports general obstacles (`person`, `crowd`, `vehicle`, `motorcycle`, `bicycle`, `bus`, `truck`, `dog`, `cow`, `stairs`, `barrier`, `obstacle`, `tree`). Custom Indian street hazards (`pothole`, `open_drain`, `open_manhole`, `broken_footpath`, `auto_rickshaw`) remain **disabled** (`enabled: false` in `frontend/src/ai/mirage/mirageRegistry.ts`) until demonstrated and evaluated on documented pedestrian-perspective datasets.
 
 ## Candidate Public Datasets (Verify License Before Use)
+- **ROD-Dataset (`Abtinzandi/Obstacle-Detection-Dataset-YOLO`, MIT):** https://huggingface.co/datasets/Abtinzandi/Obstacle-Detection-Dataset-YOLO (24,326 smartphone pedestrian-view images across 25 obstacle classes: `Stairs`, `Manhole`, `Electrical Pole`, `Dustbin`, `Guard rail`, `Traffic Cone`, `Person`, `Motorcycle`, `Dog`, etc.). Training config: [`rod_dataset.yaml`](../ai-training/rod_dataset.yaml), Colab trainer: [`train_rod_detector.py`](../ai-training/scripts/train_rod_detector.py).
 - **IDD (India Driving Dataset):** https://idd.insaan.iiit.ac.in/dataset/details/ (auto-rickshaws, two-wheelers, roadside animals, unpaved shoulders)
 - **RDD2022 (Road Damage Dataset):** https://crddc2022.sekilab.global/data/ (potholes, surface cracks)
 

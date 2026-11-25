@@ -47,7 +47,7 @@ const EXACT_OR_PHRASE_MAP: Array<[RegExp, string]> = [
   [/\b(cows?|bulls?|cattle|calves)\b/, 'cow'],
   [/\b(stairs?|staircases?|steps?)\b/, 'stairs'],
   [/\b(barricades?|barriers?|fences?|railings?|guardrails?|cones?)\b/, 'barrier'],
-  [/\b(pillars?|poles?|posts?|bollards?|bench(?:es)?|chairs?|tables?|suitcases?|bags?|carts?|fire hydrants?|parking meters?|potted plants?|stop signs?)\b/, 'obstacle'],
+  [/\b(pillars?|poles?|posts?|bollards?|bench(?:es)?|chairs?|tables?|suitcases?|bags?|carts?|trash cans?|garbage cans?|waste bins?|dumpsters?|fire hydrants?|parking meters?|potted plants?|stop signs?)\b/, 'obstacle'],
   [/\b(trees?|bush(?:es)?)\b/, 'tree'],
 ];
 

@@ -1,0 +1,314 @@
+<!DOCTYPE html><html lang="en"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drishti AI — Detection &amp; Alert States</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script id="tailwind-config">/** @type {import('tailwindcss').Config} */
+globalThis.tailwind = globalThis.tailwind || {};
+globalThis.tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        'royal-ivory': '#FFF8F3',
+        'on-royal-ivory': '#211B12',
+        'royal-gold': '#9D6E19',
+        'on-royal-gold': '#060606',
+        'royal-gold-bright': '#F7BC62',
+        'on-royal-gold-bright': '#442C00',
+        'royal-jade': '#136A5B',
+        'on-royal-jade': '#FFFFFF',
+        'royal-crimson': '#B42724',
+        'on-royal-crimson': '#FFFFFF',
+        'light-primary': '#250C36',
+        'light-on-primary': '#FFFFFF',
+        'light-primary-container': '#3B224C',
+        'light-on-primary-container': '#F3DAFF',
+        'light-secondary': '#136A5B',
+        'light-on-secondary': '#FFFFFF',
+        'light-secondary-container': '#A1EFDB',
+        'light-on-secondary-container': '#00201A',
+        'light-tertiary': '#805600',
+        'light-on-tertiary': '#FFFFFF',
+        'light-tertiary-container': '#FFDDB0',
+        'light-on-tertiary-container': '#281800',
+        'light-error': '#B42724',
+        'light-on-error': '#FFFFFF',
+        'light-error-container': '#FFDAD6',
+        'light-on-error-container': '#910810',
+        'light-background': '#FFF8F3',
+        'light-on-background': '#211B12',
+        'light-surface': '#FFF8F3',
+        'light-surface-container-lowest': '#FFFFFF',
+        'light-surface-container-low': '#FFF1E3',
+        'light-surface-container': '#F9ECDE',
+        'light-surface-container-high': '#F3E6D8',
+        'light-surface-container-highest': '#EEE0D2',
+        'light-on-surface': '#211B12',
+        'light-on-surface-variant': '#4B454D',
+        'light-outline': '#7C757E',
+        'light-outline-variant': '#CDC3CE',
+        'dark-primary': '#DCBAEF',
+        'dark-on-primary': '#3F2650',
+        'dark-primary-container': '#3B224C',
+        'dark-on-primary-container': '#F3DAFF',
+        'dark-secondary': '#88D5C2',
+        'dark-on-secondary': '#00382F',
+        'dark-secondary-container': '#026354',
+        'dark-on-secondary-container': '#B7FFEC',
+        'dark-tertiary': '#F7BC62',
+        'dark-on-tertiary': '#442C00',
+        'dark-tertiary-container': '#614000',
+        'dark-on-tertiary-container': '#FFDDB0',
+        'dark-error': '#FFB4AB',
+        'dark-on-error': '#690006',
+        'dark-error-container': '#910810',
+        'dark-on-error-container': '#FFDAD6',
+        'dark-background': '#18120A',
+        'dark-on-background': '#EEE0D2',
+        'dark-surface': '#18120A',
+        'dark-surface-container-lowest': '#130D06',
+        'dark-surface-container-low': '#211B12',
+        'dark-surface-container': '#251F16',
+        'dark-surface-container-high': '#302920',
+        'dark-surface-container-highest': '#3B342A',
+        'dark-on-surface': '#EEE0D2',
+        'dark-on-surface-variant': '#CDC3CE',
+        'dark-outline': '#968E98',
+        'dark-outline-variant': '#4B454D',
+      },
+      borderRadius: {
+        'sm': '8px',
+        'DEFAULT': '12px',
+        'md': '16px',
+        'lg': '20px',
+        'xl': '28px',
+        'full': '9999px',
+      },
+      spacing: {
+        'gutter-xs': '4px',
+        'gutter-sm': '8px',
+        'gutter-md': '16px',
+        'gutter-lg': '24px',
+        'gutter-xl': '32px',
+        'section': '40px',
+        'page-margin': '20px',
+      },
+      fontFamily: {
+        'display': ['"Red Hat Display"', 'sans-serif'],
+        'headline': ['"Red Hat Display"', 'sans-serif'],
+        'title': ['"Commissioner"', 'sans-serif'],
+        'body': ['"Commissioner"', 'sans-serif'],
+        'label': ['"Commissioner"', 'sans-serif'],
+        'mono': ['"Spline Sans Mono"', 'monospace'],
+      },
+      fontSize: {
+        'display-lg': ['40px', { lineHeight: '46px', letterSpacing: '-0.5px', fontWeight: '700' }],
+        'display-lg-mobile': ['32px', { lineHeight: '38px', letterSpacing: '-0.25px', fontWeight: '700' }],
+        'headline-lg': ['34px', { lineHeight: '40px', letterSpacing: '-0.25px', fontWeight: '700' }],
+        'headline-lg-mobile': ['28px', { lineHeight: '34px', letterSpacing: '-0.2px', fontWeight: '700' }],
+        'headline-md': ['24px', { lineHeight: '30px', letterSpacing: '0px', fontWeight: '700' }],
+        'title-lg': ['20px', { lineHeight: '26px', letterSpacing: '0px', fontWeight: '600' }],
+        'title-md': ['18px', { lineHeight: '24px', letterSpacing: '0px', fontWeight: '600' }],
+        'body-lg': ['18px', { lineHeight: '26px', letterSpacing: '0px', fontWeight: '500' }],
+        'body-md': ['16px', { lineHeight: '24px', letterSpacing: '0px', fontWeight: '400' }],
+        'label-lg': ['16px', { lineHeight: '22px', letterSpacing: '0.1px', fontWeight: '600' }],
+        'label-md': ['14px', { lineHeight: '20px', letterSpacing: '0.15px', fontWeight: '600' }],
+        'mono-sm': ['14px', { lineHeight: '20px', letterSpacing: '0px', fontWeight: '500' }],
+      },
+      transitionDuration: {
+        'state-change': '120ms',
+        'surface-enter': '240ms',
+        'surface-exit': '160ms',
+      },
+      transitionDelay: {
+        'state-change': '0ms',
+        'surface-enter': '0ms',
+        'surface-exit': '0ms',
+      },
+      transitionTimingFunction: {
+        'state-change': 'ease-out',
+        'surface-enter': 'cubic-bezier(0.2, 0, 0, 1)',
+        'surface-exit': 'cubic-bezier(0.3, 0, 1, 1)',
+      },
+    },
+  },
+};
+if (typeof module !== 'undefined') module.exports = globalThis.tailwind.config;
+</script>
+  <script>try{if(localStorage.getItem('drishti-theme')==='dark')document.documentElement.classList.add('dark');}catch(e){}</script>
+  <link href="https://fonts.googleapis.com/css2?family=Commissioner:wght@400;500;600;700&amp;family=Red+Hat+Display:wght@600;700&amp;family=Spline+Sans+Mono:wght@500&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=block" rel="stylesheet">
+  <style>.material-symbols-outlined, .material-symbols-rounded, .material-symbols-sharp, .material-icons { display: inline-block; width: 1em; height: 1em; line-height: 1 !important; box-sizing: content-box; overflow: hidden; white-space: nowrap; direction: ltr; vertical-align: middle; }</style>
+</head>
+<body class="bg-light-surface dark:bg-dark-surface text-light-on-surface dark:text-dark-on-surface font-body antialiased transition-colors duration-state-change">
+  <main class="min-h-[884px] w-full max-w-md mx-auto bg-light-surface dark:bg-dark-surface text-light-on-surface dark:text-dark-on-surface px-page-margin py-gutter-lg flex flex-col justify-between gap-5" data-stitch-vh="min-h-[884px]===min-h-screen">
+    <header class="flex items-center justify-between gap-3">
+      <a href="../06-live-assistance/LiveAssistance.html" aria-label="Back to Live Assistance" class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-light-surface-container dark:bg-dark-surface-container border border-light-outline-variant dark:border-dark-outline-variant text-light-on-surface dark:text-dark-on-surface">
+        <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+      </a>
+      <h1 class="font-headline text-headline-md text-light-primary dark:text-dark-primary flex-1">Detection &amp; Alert States</h1>
+    </header>
+
+    <section aria-label="Select state to preview" class="flex flex-wrap gap-2">
+      <button type="button" onclick="showState(&#39;none&#39;)" id="st-none" class="min-h-11 px-3 py-1.5 rounded-full bg-light-surface-container dark:bg-dark-surface-container border border-light-outline-variant dark:border-dark-outline-variant font-label text-label-md">No object</button>
+      <button type="button" onclick="showState(&#39;single&#39;)" id="st-single" class="min-h-11 px-3 py-1.5 rounded-full bg-light-primary dark:bg-dark-primary text-light-on-primary dark:text-dark-on-primary border-2 border-light-tertiary dark:border-dark-tertiary font-label text-label-md">Detected</button>
+      <button type="button" onclick="showState(&#39;multi&#39;)" id="st-multi" class="min-h-11 px-3 py-1.5 rounded-full bg-light-surface-container dark:bg-dark-surface-container border border-light-outline-variant dark:border-dark-outline-variant font-label text-label-md">Multiple</button>
+      <button type="button" onclick="showState(&#39;engine&#39;)" id="st-engine" class="min-h-11 px-3 py-1.5 rounded-full bg-light-surface-container dark:bg-dark-surface-container border border-light-outline-variant dark:border-dark-outline-variant font-label text-label-md">Engine issue</button>
+      <button type="button" onclick="showState(&#39;camera&#39;)" id="st-camera" class="min-h-11 px-3 py-1.5 rounded-full bg-light-surface-container dark:bg-dark-surface-container border border-light-outline-variant dark:border-dark-outline-variant font-label text-label-md">Camera lost</button>
+      <button type="button" onclick="showState(&#39;error&#39;)" id="st-error" class="min-h-11 px-3 py-1.5 rounded-full bg-light-surface-container dark:bg-dark-surface-container border border-light-outline-variant dark:border-dark-outline-variant font-label text-label-md">Processing error</button>
+      <button type="button" onclick="showState(&#39;stopped&#39;)" id="st-stopped" class="min-h-11 px-3 py-1.5 rounded-full bg-light-surface-container dark:bg-dark-surface-container border border-light-outline-variant dark:border-dark-outline-variant font-label text-label-md">Stopped</button>
+    </section>
+
+    <section id="state-panel" role="alert" aria-live="assertive" class="flex-1 p-6 rounded-xl bg-light-surface-container-lowest dark:bg-dark-surface-container-high text-light-on-surface dark:text-dark-on-surface border-2 border-light-tertiary dark:border-dark-tertiary flex flex-col justify-between gap-5">
+      <div class="flex items-center justify-between gap-3">
+        <span id="state-badge" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-light-tertiary-container dark:bg-dark-tertiary-container text-light-on-tertiary-container dark:text-dark-on-tertiary-container font-label text-label-md">
+          <span id="state-badge-icon" class="material-symbols-outlined text-label-lg" aria-hidden="true">campaign</span>
+          <span id="state-badge-text">Supported object detected</span>
+        </span>
+      </div>
+
+      <div class="flex flex-col gap-3 my-auto">
+        <span id="state-hero-icon" class="material-symbols-outlined text-display-lg text-light-tertiary dark:text-dark-tertiary" aria-hidden="true">directions_walk</span>
+        <h2 id="state-title" class="font-headline text-display-lg-mobile text-light-primary dark:text-dark-primary text-balance">
+          Person detected nearby.
+        </h2>
+        <p id="state-desc" class="font-body text-body-lg text-light-on-surface-variant dark:text-dark-on-surface-variant text-pretty">
+          Spoken alert delivered via device speech synthesis.
+        </p>
+      </div>
+
+      <div id="state-footer-info" class="p-3.5 rounded-md bg-light-surface-container dark:bg-dark-surface-container text-light-on-surface dark:text-dark-on-surface flex items-center gap-2.5">
+        <span class="material-symbols-outlined text-light-secondary dark:text-dark-secondary" aria-hidden="true">volume_up</span>
+        <span class="font-label text-label-md">Speech alerts active · Cactus Mirage</span>
+      </div>
+    </section>
+
+    <footer class="pb-gutter-sm">
+      <a href="../04-home-dashboard/HomeDashboard.html" class="w-full inline-flex items-center justify-center gap-3 min-h-16 px-6 py-5 rounded-xl bg-light-error dark:bg-royal-crimson text-light-on-error border-2 border-light-error-container font-headline text-headline-md">
+        <span class="material-symbols-outlined text-headline-md" aria-hidden="true">stop_circle</span>
+        <span>Stop Assistance</span>
+      </a>
+    </footer>
+  </main>
+
+  <script>
+    const states = {
+      none: {
+        panelClass: 'flex-1 p-6 rounded-xl bg-light-surface-container dark:bg-dark-surface-container text-light-on-surface dark:text-dark-on-surface border-2 border-light-secondary dark:border-dark-secondary flex flex-col justify-between gap-5',
+        badgeClass: 'inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-light-secondary-container dark:bg-dark-secondary-container text-light-on-secondary-container dark:text-dark-on-secondary-container font-label text-label-md',
+        badgeIcon: 'visibility',
+        badgeText: 'Scanning surroundings',
+        heroIcon: 'check_circle',
+        heroIconClass: 'material-symbols-outlined text-display-lg text-light-secondary dark:text-dark-secondary',
+        title: 'No supported object detected.',
+        titleClass: 'font-headline text-display-lg-mobile text-light-primary dark:text-dark-primary text-balance',
+        desc: 'Cactus Mirage is active and monitoring locally. Continue using your primary mobility aid.',
+        descClass: 'font-body text-body-lg text-light-on-surface-variant dark:text-dark-on-surface-variant text-pretty',
+        footerText: 'Camera & Vision Engine active'
+      },
+      single: {
+        panelClass: 'flex-1 p-6 rounded-xl bg-light-surface-container-lowest dark:bg-dark-surface-container-high text-light-on-surface dark:text-dark-on-surface border-2 border-light-tertiary dark:border-dark-tertiary flex flex-col justify-between gap-5',
+        badgeClass: 'inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-light-tertiary-container dark:bg-dark-tertiary-container text-light-on-tertiary-container dark:text-dark-on-tertiary-container font-label text-label-md',
+        badgeIcon: 'campaign',
+        badgeText: 'Supported object detected',
+        heroIcon: 'directions_walk',
+        heroIconClass: 'material-symbols-outlined text-display-lg text-light-tertiary dark:text-dark-tertiary',
+        title: 'Person detected nearby.',
+        titleClass: 'font-headline text-display-lg-mobile text-light-primary dark:text-dark-primary text-balance',
+        desc: 'Spoken alert delivered via device speech synthesis.',
+        descClass: 'font-body text-body-lg text-light-on-surface-variant dark:text-dark-on-surface-variant text-pretty',
+        footerText: 'Speech alerts active · Cactus Mirage'
+      },
+      multi: {
+        panelClass: 'flex-1 p-6 rounded-xl bg-light-surface-container-lowest dark:bg-dark-surface-container-high text-light-on-surface dark:text-dark-on-surface border-2 border-light-tertiary dark:border-dark-tertiary flex flex-col justify-between gap-5',
+        badgeClass: 'inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-light-tertiary-container dark:bg-dark-tertiary-container text-light-on-tertiary-container dark:text-dark-on-tertiary-container font-label text-label-md',
+        badgeIcon: 'warning',
+        badgeText: 'Multiple detections',
+        heroIcon: 'directions_car',
+        heroIconClass: 'material-symbols-outlined text-display-lg text-light-tertiary dark:text-dark-tertiary',
+        title: 'Person detected. Vehicle detected.',
+        titleClass: 'font-headline text-display-lg-mobile text-light-primary dark:text-dark-primary text-balance',
+        desc: 'Multiple supported objects in view. Spoken alerts prioritized by model output.',
+        descClass: 'font-body text-body-lg text-light-on-surface-variant dark:text-dark-on-surface-variant text-pretty',
+        footerText: '2 supported detections announced'
+      },
+      engine: {
+        panelClass: 'flex-1 p-6 rounded-xl bg-light-error-container dark:bg-dark-error-container text-light-on-error-container dark:text-dark-on-error-container border-2 border-light-error dark:border-dark-error flex flex-col justify-between gap-5',
+        badgeClass: 'inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-light-error dark:bg-royal-crimson text-light-on-error font-label text-label-md',
+        badgeIcon: 'memory',
+        badgeText: 'System warning',
+        heroIcon: 'warning',
+        heroIconClass: 'material-symbols-outlined text-display-lg text-light-error dark:text-dark-error',
+        title: 'Vision engine temporarily unavailable.',
+        titleClass: 'font-headline text-display-lg-mobile text-balance',
+        desc: 'Cactus Mirage paused due to device resource limits. Obstacle alerts are not active.',
+        descClass: 'font-body text-body-lg text-pretty',
+        footerText: 'Stop and restart assistance to recover'
+      },
+      camera: {
+        panelClass: 'flex-1 p-6 rounded-xl bg-light-error-container dark:bg-dark-error-container text-light-on-error-container dark:text-dark-on-error-container border-2 border-light-error dark:border-dark-error flex flex-col justify-between gap-5',
+        badgeClass: 'inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-light-error dark:bg-royal-crimson text-light-on-error font-label text-label-md',
+        badgeIcon: 'videocam_off',
+        badgeText: 'Critical failure',
+        heroIcon: 'videocam_off',
+        heroIconClass: 'material-symbols-outlined text-display-lg text-light-error dark:text-dark-error',
+        title: 'Camera disconnected.',
+        titleClass: 'font-headline text-display-lg-mobile text-balance',
+        desc: 'Camera stream interrupted. Detection has stopped. Check permissions or restart.',
+        descClass: 'font-body text-body-lg text-pretty',
+        footerText: 'No frames available for analysis'
+      },
+      error: {
+        panelClass: 'flex-1 p-6 rounded-xl bg-light-error-container dark:bg-dark-error-container text-light-on-error-container dark:text-dark-on-error-container border-2 border-light-error dark:border-dark-error flex flex-col justify-between gap-5',
+        badgeClass: 'inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-light-error dark:bg-royal-crimson text-light-on-error font-label text-label-md',
+        badgeIcon: 'error',
+        badgeText: 'Processing error',
+        heroIcon: 'error',
+        heroIconClass: 'material-symbols-outlined text-display-lg text-light-error dark:text-dark-error',
+        title: 'Processing error occurred.',
+        titleClass: 'font-headline text-display-lg-mobile text-balance',
+        desc: 'On-device inference encountered an unexpected error. Stop assistance and retry.',
+        descClass: 'font-body text-body-lg text-pretty',
+        footerText: 'Audio alert: Assistance paused'
+      },
+      stopped: {
+        panelClass: 'flex-1 p-6 rounded-xl bg-light-surface-container dark:bg-dark-surface-container text-light-on-surface dark:text-dark-on-surface border-2 border-light-outline dark:border-dark-outline flex flex-col justify-between gap-5',
+        badgeClass: 'inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-light-surface-container-highest dark:bg-dark-surface-container-highest text-light-on-surface dark:text-dark-on-surface font-label text-label-md',
+        badgeIcon: 'stop_circle',
+        badgeText: 'Assistance stopped',
+        heroIcon: 'pause_circle',
+        heroIconClass: 'material-symbols-outlined text-display-lg text-light-on-surface-variant dark:text-dark-on-surface-variant',
+        title: 'Assistance stopped.',
+        titleClass: 'font-headline text-display-lg-mobile text-balance',
+        desc: 'Camera and Cactus Mirage are off. Return to Home when you are ready to start again.',
+        descClass: 'font-body text-body-lg text-light-on-surface-variant dark:text-dark-on-surface-variant text-pretty',
+        footerText: 'Camera released · Idle'
+      }
+    };
+
+    function showState(key) {
+      const s = states[key];
+      document.getElementById('state-panel').className = s.panelClass;
+      document.getElementById('state-badge').className = s.badgeClass;
+      document.getElementById('state-badge-icon').textContent = s.badgeIcon;
+      document.getElementById('state-badge-text').textContent = s.badgeText;
+      document.getElementById('state-hero-icon').className = s.heroIconClass;
+      document.getElementById('state-hero-icon').textContent = s.heroIcon;
+      document.getElementById('state-title').className = s.titleClass;
+      document.getElementById('state-title').textContent = s.title;
+      document.getElementById('state-desc').className = s.descClass;
+      document.getElementById('state-desc').textContent = s.desc;
+      document.getElementById('state-footer-info').querySelector('span:last-child').textContent = s.footerText;
+
+      Object.keys(states).forEach(k => {
+        const btn = document.getElementById(`st-${k}`);
+        btn.className = k === key
+          ? 'min-h-11 px-3 py-1.5 rounded-full bg-light-primary dark:bg-dark-primary text-light-on-primary dark:text-dark-on-primary border-2 border-light-tertiary dark:border-dark-tertiary font-label text-label-md'
+          : 'min-h-11 px-3 py-1.5 rounded-full bg-light-surface-container dark:bg-dark-surface-container border border-light-outline-variant dark:border-dark-outline-variant font-label text-label-md';
+      });
+    }
+  </script>
+
+
+</body></html>
