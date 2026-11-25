@@ -112,8 +112,48 @@ export function SettingsView({
             onChange={(e) => onChange({ ...settings, hapticsEnabled: e.target.checked })}
             style={{ width: 22, height: 22 }}
           />
-          <span>Enable haptic vibration for urgent alerts (where supported)</span>
+          <span>Enable directional haptic vibration for urgent alerts</span>
         </label>
+      </div>
+
+      <div className="setting-row">
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <input
+            type="checkbox"
+            checked={settings.spatialAudioEnabled}
+            onChange={(e) => onChange({ ...settings, spatialAudioEnabled: e.target.checked })}
+            style={{ width: 22, height: 22 }}
+          />
+          <span>Enable 3D stereo directional audio tones (left/right earbud cues)</span>
+        </label>
+      </div>
+
+      <div className="setting-row">
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <input
+            type="checkbox"
+            checked={settings.batterySaverEnabled}
+            onChange={(e) => onChange({ ...settings, batterySaverEnabled: e.target.checked })}
+            style={{ width: 22, height: 22 }}
+          />
+          <span>Adaptive battery saver (slows scan rate when standing still)</span>
+        </label>
+      </div>
+
+      <div className="setting-row">
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <input
+            type="checkbox"
+            checked={settings.voiceCommandsEnabled}
+            onChange={(e) => onChange({ ...settings, voiceCommandsEnabled: e.target.checked })}
+            style={{ width: 22, height: 22 }}
+          />
+          <span>Hands-free voice commands via Cactus Whistle (offline mic)</span>
+        </label>
+        <div style={{ fontSize: '0.85rem', color: 'var(--color-muted-foreground)' }}>
+          Supported commands: &ldquo;Start&rdquo;, &ldquo;Pause&rdquo;, &ldquo;Repeat&rdquo;,
+          &ldquo;What is ahead&rdquo;, &ldquo;Faster&rdquo;, &ldquo;Slower&rdquo;.
+        </div>
       </div>
 
       <div className="setting-row">

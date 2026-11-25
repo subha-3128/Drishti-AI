@@ -23,11 +23,14 @@ describe('Mirage Adapter & Registry', () => {
     expect(dets[1].bbox.x1).toBeCloseTo(0.62, 2);
   });
 
-  it('keeps unvalidated Indian road hazards disabled in the registry', () => {
+  it('keeps unvalidated Indian road hazards disabled and handles plural labels', () => {
     expect(mapMirageLabel('pothole')).toBeNull();
     expect(mapMirageLabel('open drain')).toBeNull();
     expect(mapMirageLabel('broken footpath')).toBeNull();
     expect(mapMirageLabel('stairs')?.id).toBe('stairs');
+    expect(mapMirageLabel('cars')?.id).toBe('vehicle');
+    expect(mapMirageLabel('dogs')?.id).toBe('dog');
+    expect(mapMirageLabel('trees')?.id).toBe('tree');
   });
 
   it('throws on malformed Mirage JSON or missing objects array', () => {

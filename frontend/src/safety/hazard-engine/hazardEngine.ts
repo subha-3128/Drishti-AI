@@ -48,7 +48,7 @@ export class HazardEngine {
     this.options = {
       minConfidence: options.minConfidence,
       cooldownMs: options.cooldownMs,
-      trackExpiryMs: options.trackExpiryMs ?? 3500,
+      trackExpiryMs: options.trackExpiryMs ?? 5000,
     };
   }
 

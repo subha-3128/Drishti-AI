@@ -1,9 +1,10 @@
-import { Camera, Cpu, SpeakerHigh, WifiSlash, WifiHigh } from '@phosphor-icons/react';
+import { Camera, Cpu, Microphone, SpeakerHigh, WifiSlash, WifiHigh } from '@phosphor-icons/react';
 
 export interface SystemStatusProps {
   cameraStatus: string;
   aiStatus: string;
   voiceStatus: string;
+  voiceCommandStatus: string;
   isOnline: boolean;
   modelCached: boolean;
 }
@@ -12,6 +13,7 @@ export function StatusPanel({
   cameraStatus,
   aiStatus,
   voiceStatus,
+  voiceCommandStatus,
   isOnline,
   modelCached,
 }: SystemStatusProps) {
@@ -39,6 +41,14 @@ export function StatusPanel({
           <span>Voice Output</span>
         </div>
         <div className="status-value">{voiceStatus}</div>
+      </div>
+
+      <div className="status-item">
+        <div className="status-label">
+          <Microphone size={18} weight="bold" aria-hidden="true" />
+          <span>Voice Commands</span>
+        </div>
+        <div className="status-value">{voiceCommandStatus}</div>
       </div>
 
       <div className="status-item">

@@ -1,8 +1,10 @@
 import { HazardPriority } from '../ai/mirage/mirageRegistry';
+import { HazardDirection } from '../safety/direction/directionEstimator';
 
 export interface SpeechItem {
   text: string;
   priority: HazardPriority;
+  direction?: HazardDirection;
 }
 
 export interface VoiceAvailability {
@@ -21,13 +23,34 @@ const PRIORITY_RANK: Record<HazardPriority, number> = {
 
 const UTTERANCE_WATCHDOG_MS = 8000;
 
+export function directionToPan(direction?: HazardDirection): number {
+  if (direction === 'left') return -0.85;
+  if (direction === 'right') return 0.85;
+  return 0;
+}
+
+export function hapticPatternFor(
+  priority: HazardPriority,
+  direction?: HazardDirection
+): number | number[] | null {
+  if (priority === 'P0') return [180, 60, 180, 60, 180];
+  if (priority === 'P1') {
+    if (direction === 'left') return [120, 60, 50];
+    if (direction === 'right') return [50, 60, 120];
+    return 110;
+  }
+  return null;
+}
+
 export class VoiceEngine {
   private queue: SpeechItem[] = [];
   private speakingPriority: HazardPriority | null = null;
   private watchdogTimer: number | null = null;
+  private audioCtx: AudioContext | null = null;
   private rate = 1.05;
   private volume = 1.0;
   private hapticsEnabled = true;
+  private spatialAudioEnabled = true;
   private availabilityListeners = new Set<(avail: VoiceAvailability) => void>();
   private boundOnVoicesChanged: (() => void) | null = null;
 
@@ -50,7 +73,16 @@ export class VoiceEngine {
   }
 
   isSupported(): boolean {
-    return typeof window !== 'undefined' && 'speechSynthesis' in window;
+    return (
+      typeof window !== 'undefined' &&
+      'speechSynthesis' in window &&
+      typeof SpeechSynthesisUtterance !== 'undefined'
+    );
+  }
+
+  isSpeaking(): boolean {
+    if (this.speakingPriority !== null) return true;
+    return this.isSupported() && Boolean(window.speechSynthesis.speaking);
   }
 
   subscribeAvailability(cb: (avail: VoiceAvailability) => void): () => void {
@@ -86,18 +118,30 @@ export class VoiceEngine {
     };
   }
 
-  configure(options: { rate?: number; volume?: number; hapticsEnabled?: boolean }): void {
+  configure(options: {
+    rate?: number;
+    volume?: number;
+    hapticsEnabled?: boolean;
+    spatialAudioEnabled?: boolean;
+  }): void {
     if (typeof options.rate === 'number') this.rate = options.rate;
     if (typeof options.volume === 'number') this.volume = options.volume;
     if (typeof options.hapticsEnabled === 'boolean') this.hapticsEnabled = options.hapticsEnabled;
+    if (typeof options.spatialAudioEnabled === 'boolean') {
+      this.spatialAudioEnabled = options.spatialAudioEnabled;
+    }
   }
 
-  enqueue(text: string, priority: HazardPriority = 'P2'): void {
+  enqueue(text: string, priority: HazardPriority = 'P2', direction?: HazardDirection): void {
     if (!text.trim()) return;
 
     if (this.hapticsEnabled && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-      if (priority === 'P0') navigator.vibrate([120, 60, 120]);
-      else if (priority === 'P1') navigator.vibrate(90);
+      const pattern = hapticPatternFor(priority, direction);
+      if (pattern !== null) navigator.vibrate(pattern);
+    }
+
+    if (this.spatialAudioEnabled && direction && priority !== 'P3') {
+      this.playSpatialCue(priority, direction);
     }
 
     if (!this.isSupported()) return;
@@ -119,7 +163,7 @@ export class VoiceEngine {
       this.queue.pop();
     }
 
-    this.queue.push({ text, priority });
+    this.queue.push({ text, priority, direction });
     this.queue.sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]);
     this.pump();
   }
@@ -148,7 +192,53 @@ export class VoiceEngine {
       window.speechSynthesis.removeEventListener('voiceschanged', this.boundOnVoicesChanged);
       this.boundOnVoicesChanged = null;
     }
+    if (this.audioCtx) {
+      this.audioCtx.close().catch(() => {});
+      this.audioCtx = null;
+    }
     this.availabilityListeners.clear();
+  }
+
+  private playSpatialCue(priority: HazardPriority, direction: HazardDirection): void {
+    if (typeof window === 'undefined') return;
+    const Ctor =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctor) return;
+
+    try {
+      if (!this.audioCtx) {
+        this.audioCtx = new Ctor();
+      }
+      if (this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume().catch(() => {});
+      }
+      const now = this.audioCtx.currentTime;
+      const freq = priority === 'P0' ? 880 : priority === 'P1' ? 660 : 520;
+      const duration = priority === 'P0' ? 0.16 : 0.1;
+
+      const osc = this.audioCtx.createOscillator();
+      const gain = this.audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.exponentialRampToValueAtTime(Math.max(0.05, this.volume * 0.22), now + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      if (typeof this.audioCtx.createStereoPanner === 'function') {
+        const panner = this.audioCtx.createStereoPanner();
+        panner.pan.setValueAtTime(directionToPan(direction), now);
+        osc.connect(gain).connect(panner).connect(this.audioCtx.destination);
+      } else {
+        osc.connect(gain).connect(this.audioCtx.destination);
+      }
+
+      osc.start(now);
+      osc.stop(now + duration + 0.01);
+    } catch {
+      // AudioContext creation or playback failed (autoplay restriction); ignore cleanly.
+    }
   }
 
   private clearWatchdog(): void {

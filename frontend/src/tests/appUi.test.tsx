@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import App from '../App';
 
 describe('Drishti AI Accessible UI', () => {
@@ -7,9 +7,11 @@ describe('Drishti AI Accessible UI', () => {
     localStorage.clear();
   });
 
-  it('shows onboarding disclaimer first and unlocks Start Assistance after acknowledgement', () => {
+  it('shows onboarding disclaimer first and unlocks Start Assistance after acknowledgement', async () => {
     render(<App />);
-    expect(screen.getByText(/Welcome to Drishti AI/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/Welcome to Drishti AI/i)).toBeInTheDocument();
+    });
     expect(screen.getByText(/does NOT replace a white cane/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /I Understand — Continue/i }));

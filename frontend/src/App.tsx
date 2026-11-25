@@ -9,11 +9,15 @@ import {
 } from '@phosphor-icons/react';
 import { AppState, transitionAppState } from './app/stateMachine';
 import { CameraManager, CameraStatus } from './camera/cameraManager';
+import { computeNextFrameDelayMs, MotionMonitor } from './camera/adaptiveScheduler';
 import { MirageDetection } from './ai/mirage/mirageAdapter';
 import { MirageInferenceError, MirageService } from './ai/mirage/mirageService';
 import { clearModelCache, isModelCached } from './ai/inference/modelCache';
+import { estimateDirection, formatDirectionPhrase } from './safety/direction/directionEstimator';
 import { HazardAlert, HazardEngine } from './safety/hazard-engine/hazardEngine';
 import { VoiceAvailability, VoiceEngine } from './voice/voiceEngine';
+import { MicrophoneVad } from './voice/microphoneVad';
+import { parseVoiceCommand } from './voice/voiceCommandParser';
 import { DrishtiSettings, loadSettings, saveSettings } from './storage/settings';
 import { StatusPanel } from './components/StatusPanel';
 import { OnboardingView } from './screens/OnboardingView';
@@ -29,6 +33,8 @@ export default function App() {
   const [appState, setAppState] = useState<AppState>('idle');
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>('idle');
   const [aiStatus, setAiStatus] = useState<string>('Idle (Mirage not loaded)');
+  const [voiceCmdStatus, setVoiceCmdStatus] = useState<string>('Disabled');
+  const [powerSaverActive, setPowerSaverActive] = useState<boolean>(false);
   const [isOnline, setIsOnline] = useState<boolean>(() =>
     typeof navigator !== 'undefined' ? navigator.onLine : true
   );
@@ -45,6 +51,13 @@ export default function App() {
   const appStateRef = useRef<AppState>('idle');
   const operationIdRef = useRef<number>(0);
   const startAbortRef = useRef<AbortController | null>(null);
+  const settingsRef = useRef<DrishtiSettings>(settings);
+  const lastAlertRef = useRef<HazardAlert | null>(null);
+  const liveDetectionsRef = useRef<MirageDetection[]>([]);
+
+  settingsRef.current = settings;
+  lastAlertRef.current = lastAlert;
+  liveDetectionsRef.current = liveDetections;
 
   const voiceRef = useRef<VoiceEngine | null>(null);
   if (!voiceRef.current) voiceRef.current = new VoiceEngine();
@@ -56,6 +69,12 @@ export default function App() {
   const mirageRef = useRef<MirageService | null>(null);
   if (!mirageRef.current) mirageRef.current = new MirageService();
 
+  const motionRef = useRef<MotionMonitor | null>(null);
+  if (!motionRef.current) motionRef.current = new MotionMonitor();
+
+  const micVadRef = useRef<MicrophoneVad | null>(null);
+  if (!micVadRef.current) micVadRef.current = new MicrophoneVad();
+
   const hazardEngineRef = useRef<HazardEngine | null>(null);
   if (!hazardEngineRef.current) {
     hazardEngineRef.current = new HazardEngine({
@@ -63,6 +82,13 @@ export default function App() {
       cooldownMs: settings.cooldownMs,
     });
   }
+
+  const clearOverlay = useCallback(() => {
+    const canvas = overlayRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx?.clearRect(0, 0, canvas.width, canvas.height);
+  }, []);
 
   const cameraRef = useRef<CameraManager | null>(null);
   if (!cameraRef.current) {
@@ -74,6 +100,8 @@ export default function App() {
         }
       },
       onError: (msg) => {
+        clearOverlay();
+        setLiveDetections([]);
         setErrorBanner(msg);
         setAppState((prev) => {
           const res = transitionAppState(prev, 'camera_error');
@@ -92,6 +120,7 @@ export default function App() {
       rate: settings.speechRate,
       volume: settings.speechVolume,
       hapticsEnabled: settings.hapticsEnabled,
+      spatialAudioEnabled: settings.spatialAudioEnabled,
     });
     hazardEngineRef.current?.updateOptions({
       minConfidence: settings.minConfidence,
@@ -131,11 +160,14 @@ export default function App() {
         window.clearTimeout(loopTimerRef.current);
         loopTimerRef.current = null;
       }
+      motionRef.current?.stop();
       cameraRef.current?.stop();
       hazardEngineRef.current?.reset();
       releaseWakeLock();
+      clearOverlay();
       setLiveDetections([]);
       setInferenceMs(null);
+      setPowerSaverActive(false);
 
       setAppState((prev) => {
         const stopping = transitionAppState(prev, 'stopping');
@@ -148,7 +180,7 @@ export default function App() {
         voiceRef.current?.speakImmediateSystem(spokenAnnouncement);
       }
     },
-    [releaseWakeLock]
+    [clearOverlay, releaseWakeLock]
   );
 
   useEffect(() => {
@@ -169,6 +201,8 @@ export default function App() {
       operationIdRef.current += 1;
       startAbortRef.current?.abort();
       if (loopTimerRef.current !== null) window.clearTimeout(loopTimerRef.current);
+      motionRef.current?.stop();
+      micVadRef.current?.stop();
       cameraRef.current?.stop();
       mirageRef.current?.terminate();
       voiceRef.current?.dispose();
@@ -222,11 +256,12 @@ export default function App() {
         const frame = cam.captureNewestFrame();
         if (frame) {
           try {
-            const result = await mirage.detectFrame(frame.imageData, settings.minConfidence, frame.timestamp);
+            const cur = settingsRef.current;
+            const result = await mirage.detectFrame(frame.imageData, cur.minConfidence, frame.timestamp);
             if (result && appStateRef.current === 'active') {
               setInferenceMs(result.inferenceMs);
               setLiveDetections(result.detections);
-              if (settings.showCameraPreview) {
+              if (cur.showCameraPreview) {
                 drawOverlay(result.detections);
               }
 
@@ -234,24 +269,35 @@ export default function App() {
               if (alerts.length > 0) {
                 setLastAlert(alerts[0]);
                 for (const alert of alerts) {
-                  voiceRef.current?.enqueue(alert.message, alert.priority);
+                  voiceRef.current?.enqueue(alert.message, alert.priority, alert.direction);
                 }
               }
 
-              if (result.inferenceMs > 1200) {
-                nextDelayMs = 300;
-              }
+              const stationary = motionRef.current?.isStationary() ?? false;
+              const hasUrgentHazard = alerts.some((a) => a.priority === 'P0' || a.priority === 'P1');
+              setPowerSaverActive(cur.batterySaverEnabled && stationary && !hasUrgentHazard);
+              nextDelayMs = computeNextFrameDelayMs({
+                inferenceMs: result.inferenceMs,
+                isStationary: stationary,
+                hasUrgentHazard,
+                batterySaverEnabled: cur.batterySaverEnabled,
+              });
             }
           } catch (err) {
             if (err instanceof MirageInferenceError && err.timedOut && appStateRef.current === 'active') {
+              const recoveryOpId = operationIdRef.current;
+              const recoverySignal = startAbortRef.current?.signal;
               try {
-                await mirageRef.current?.initialize();
-                if (appStateRef.current === 'active') {
+                await mirageRef.current?.initialize(recoverySignal);
+                if (appStateRef.current === 'active' && operationIdRef.current === recoveryOpId && !recoverySignal?.aborted) {
                   loopTimerRef.current = window.setTimeout(runFrame, 300);
                   return;
                 }
+                return;
               } catch {
-                // Fall through to error handling below.
+                if (operationIdRef.current !== recoveryOpId || recoverySignal?.aborted) {
+                  return;
+                }
               }
             }
             const msg = err instanceof Error ? err.message : 'Cactus Mirage processing failed.';
@@ -269,9 +315,9 @@ export default function App() {
     };
 
     loopTimerRef.current = window.setTimeout(runFrame, 80);
-  }, [drawOverlay, settings.minConfidence, settings.showCameraPreview, stopAssistance]);
+  }, [drawOverlay, stopAssistance]);
 
-  const startAssistance = async () => {
+  const startAssistance = useCallback(async () => {
     if (
       appStateRef.current === 'initializing_models' ||
       appStateRef.current === 'starting_camera' ||
@@ -361,9 +407,91 @@ export default function App() {
 
     appStateRef.current = activeRes.nextState;
     setAppState(activeRes.nextState);
+    motionRef.current?.start();
     voiceRef.current?.speakImmediateSystem('Assistance started.');
     scheduleNextFrame();
-  };
+  }, [scheduleNextFrame, stopAssistance]);
+
+  const startRef = useRef(startAssistance);
+  const stopRef = useRef(stopAssistance);
+  startRef.current = startAssistance;
+  stopRef.current = stopAssistance;
+
+  // Offline hands-free voice commands via Cactus Whistle.
+  useEffect(() => {
+    if (!settings.onboardingCompleted || !settings.voiceCommandsEnabled) {
+      micVadRef.current?.stop();
+      setVoiceCmdStatus('Disabled');
+      return;
+    }
+
+    const abort = new AbortController();
+    setVoiceCmdStatus('Loading Cactus Whistle...');
+
+    mirageRef.current
+      ?.initializeWhistle(abort.signal)
+      .then(async () => {
+        if (abort.signal.aborted) return;
+        await micVadRef.current!.start(
+          async (samples16k) => {
+            if (abort.signal.aborted || !mirageRef.current?.isWhistleReady()) return;
+            try {
+              const transcript = await mirageRef.current.transcribeAudio(samples16k);
+              const cmd = parseVoiceCommand(transcript);
+              if (!cmd) return;
+
+              if (cmd === 'pause') {
+                stopRef.current('Paused by voice command.');
+              } else if (cmd === 'start') {
+                void startRef.current();
+              } else if (cmd === 'repeat') {
+                voiceRef.current?.speakImmediateSystem(
+                  lastAlertRef.current?.message ?? 'No recent alert.'
+                );
+              } else if (cmd === 'ahead') {
+                const top = liveDetectionsRef.current.slice(0, 3);
+                if (top.length === 0) {
+                  voiceRef.current?.speakImmediateSystem('No obstacles currently in view.');
+                } else {
+                  const summary = top
+                    .map((d) => `${d.spokenName} ${formatDirectionPhrase(estimateDirection(d.bbox, d.confidence))}`)
+                    .join(', ');
+                  voiceRef.current?.speakImmediateSystem(`In view: ${summary}.`);
+                }
+              } else if (cmd === 'faster') {
+                setSettings((prev) => ({
+                  ...prev,
+                  speechRate: Math.min(1.6, Number((prev.speechRate + 0.15).toFixed(2))),
+                }));
+                voiceRef.current?.speakImmediateSystem('Speech rate increased.');
+              } else if (cmd === 'slower') {
+                setSettings((prev) => ({
+                  ...prev,
+                  speechRate: Math.max(0.7, Number((prev.speechRate - 0.15).toFixed(2))),
+                }));
+                voiceRef.current?.speakImmediateSystem('Speech rate decreased.');
+              }
+            } catch {
+              // Ignore single transcription failure without interrupting visual assistance.
+            }
+          },
+          () => voiceRef.current?.isSpeaking() ?? false
+        );
+        if (!abort.signal.aborted) {
+          setVoiceCmdStatus('Listening (Cactus Whistle)');
+        }
+      })
+      .catch((err) => {
+        if (abort.signal.aborted) return;
+        const msg = err instanceof Error ? err.message : 'Voice commands unavailable.';
+        setVoiceCmdStatus(`Unavailable (${msg})`);
+      });
+
+    return () => {
+      abort.abort();
+      micVadRef.current?.stop();
+    };
+  }, [settings.onboardingCompleted, settings.voiceCommandsEnabled]);
 
   const isRunning = appState === 'active' || appState === 'initializing_models' || appState === 'starting_camera';
 
@@ -459,6 +587,7 @@ export default function App() {
               <div className="card" aria-live="polite" aria-atomic="true">
                 <div style={{ fontSize: '0.85rem', color: 'var(--color-muted-foreground)' }}>
                   Latest Spoken Alert {inferenceMs !== null ? `• ${inferenceMs} ms/frame` : ''}
+                  {powerSaverActive ? ' • Stationary Battery Saver' : ''}
                 </div>
                 <div style={{ fontSize: '1.25rem', fontWeight: 700, marginTop: 4 }}>
                   {lastAlert
@@ -489,6 +618,7 @@ export default function App() {
                 cameraStatus={cameraStatus}
                 aiStatus={aiStatus}
                 voiceStatus={voiceAvailability.statusLabel}
+                voiceCommandStatus={voiceCmdStatus}
                 isOnline={isOnline}
                 modelCached={modelCached}
               />
@@ -508,6 +638,9 @@ export default function App() {
                 voiceRef.current?.speakImmediateSystem('Drishti AI voice test. Obstacle ahead.')
               }
               onClearModelCache={async () => {
+                if (!isRunning) {
+                  mirageRef.current?.terminate();
+                }
                 await clearModelCache();
                 setModelCached(false);
                 setAiStatus('Cache cleared');

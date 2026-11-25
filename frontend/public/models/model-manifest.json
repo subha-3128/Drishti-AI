@@ -47,6 +47,28 @@
         "tree"
       ],
       "status": "bundled"
+    },
+    {
+      "id": "cactus-whistle-v1",
+      "name": "Cactus Whistle",
+      "version": "4.1.4",
+      "task": "speech-command-recognition",
+      "url": "/models/whistle.cact",
+      "fileSizeBytes": 16919407,
+      "sha256": "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb",
+      "source": "https://huggingface.co/Cactus-Compute/whistle",
+      "license": "Apache-2.0",
+      "inputSize": [16000, 1],
+      "runtime": "cactus-wasm",
+      "supportedClasses": [
+        "repeat",
+        "pause",
+        "start",
+        "ahead",
+        "faster",
+        "slower"
+      ],
+      "status": "optional"
     }
   ]
 }

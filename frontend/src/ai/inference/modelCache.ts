@@ -31,9 +31,10 @@ export function validateManifest(data: unknown): data is ModelManifest {
     (m) =>
       m &&
       typeof m.id === 'string' &&
+      typeof m.name === 'string' &&
       typeof m.url === 'string' &&
       typeof m.sha256 === 'string' &&
-      m.sha256.length === 64 &&
+      /^[0-9a-f]{64}$/i.test(m.sha256) &&
       typeof m.fileSizeBytes === 'number' &&
       m.fileSizeBytes > 0
   );

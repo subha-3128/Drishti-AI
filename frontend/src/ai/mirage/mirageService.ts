@@ -34,15 +34,22 @@ interface PendingRequest<T> {
 export class MirageService {
   private worker: Worker | null = null;
   private ready = false;
+  private whistleReady = false;
   private busy = false;
   private modelName = 'Cactus Mirage';
   private runtime = 'cactus-wasm';
   private nextRequestId = 1;
   private pendingInit: PendingRequest<{ runtime: 'cactus-wasm' }> | null = null;
+  private pendingWhistleInit: PendingRequest<void> | null = null;
   private pendingDescribe: PendingRequest<MirageInferenceResult> | null = null;
+  private pendingTranscribe: PendingRequest<string> | null = null;
 
   isReady(): boolean {
     return this.ready;
+  }
+
+  isWhistleReady(): boolean {
+    return this.whistleReady;
   }
 
   isBusy(): boolean {
@@ -51,6 +58,17 @@ export class MirageService {
 
   getModelName(): string {
     return this.modelName;
+  }
+
+  private ensureWorker(): Worker {
+    if (!this.worker) {
+      const worker = new Worker(new URL('../../workers/mirage.worker.ts', import.meta.url), {
+        type: 'module',
+      });
+      this.attachListeners(worker);
+      this.worker = worker;
+    }
+    return this.worker;
   }
 
   async initialize(signal?: AbortSignal): Promise<{ modelName: string; runtime: string }> {
@@ -77,14 +95,7 @@ export class MirageService {
       throw new MirageInitError('Mirage initialization cancelled.');
     }
 
-    this.terminate();
-
-    const worker = new Worker(new URL('../../workers/mirage.worker.ts', import.meta.url), {
-      type: 'module',
-    });
-    this.attachListeners(worker);
-    this.worker = worker;
-
+    const worker = this.ensureWorker();
     const requestId = this.nextRequestId++;
     const res = await new Promise<{ runtime: 'cactus-wasm' }>((resolve, reject) => {
       const timer = window.setTimeout(() => {
@@ -115,6 +126,54 @@ export class MirageService {
     this.runtime = res.runtime;
     this.ready = true;
     return { modelName: this.modelName, runtime: res.runtime };
+  }
+
+  async initializeWhistle(signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) {
+      throw new MirageInitError('Whistle initialization cancelled.');
+    }
+    if (this.whistleReady && this.worker) {
+      return;
+    }
+
+    const manifest = await loadManifest();
+    if (signal?.aborted) throw new MirageInitError('Whistle initialization cancelled.');
+
+    const entry = manifest.models.find((m) => m.id === 'cactus-whistle-v1');
+    if (!entry) {
+      throw new MirageInitError('Cactus Whistle entry missing from model manifest.');
+    }
+
+    const modelBytes = await loadVerifiedModelBytes(entry);
+    if (signal?.aborted) throw new MirageInitError('Whistle initialization cancelled.');
+
+    const worker = this.ensureWorker();
+    const requestId = this.nextRequestId++;
+    await new Promise<void>((resolve, reject) => {
+      const timer = window.setTimeout(() => {
+        if (this.pendingWhistleInit?.requestId === requestId) {
+          this.pendingWhistleInit = null;
+          reject(new MirageInitError('Cactus Whistle initialization timed out.'));
+        }
+      }, 25000);
+
+      this.pendingWhistleInit = { requestId, timer, resolve, reject };
+
+      if (signal) {
+        const onAbort = () => {
+          if (this.pendingWhistleInit?.requestId === requestId) {
+            window.clearTimeout(timer);
+            this.pendingWhistleInit = null;
+            reject(new MirageInitError('Whistle initialization cancelled.'));
+          }
+        };
+        signal.addEventListener('abort', onAbort, { once: true });
+      }
+
+      worker.postMessage({ type: 'INIT_WHISTLE', requestId, modelBytes }, [modelBytes]);
+    });
+
+    this.whistleReady = true;
   }
 
   /**
@@ -168,6 +227,28 @@ export class MirageService {
     }
   }
 
+  async transcribeAudio(samples: Float32Array): Promise<string> {
+    if (!this.worker || !this.whistleReady || this.pendingTranscribe) {
+      return '';
+    }
+    const requestId = this.nextRequestId++;
+    return new Promise<string>((resolve, reject) => {
+      if (!this.worker) {
+        resolve('');
+        return;
+      }
+      const timer = window.setTimeout(() => {
+        if (this.pendingTranscribe?.requestId === requestId) {
+          this.pendingTranscribe = null;
+          reject(new Error('Whistle transcription timed out.'));
+        }
+      }, 6000);
+
+      this.pendingTranscribe = { requestId, timer, resolve, reject };
+      this.worker.postMessage({ type: 'TRANSCRIBE', requestId, samples }, [samples.buffer]);
+    });
+  }
+
   private attachListeners(worker: Worker): void {
     worker.onmessage = (event: MessageEvent<MirageWorkerResponse>) => {
       const msg = event.data;
@@ -178,11 +259,18 @@ export class MirageService {
         if (!p || p.requestId !== msg.requestId) return;
         window.clearTimeout(p.timer);
         this.pendingInit = null;
-        if (msg.type === 'INIT_OK') {
-          p.resolve({ runtime: msg.runtime });
-        } else {
-          p.reject(new MirageInitError(msg.error));
-        }
+        if (msg.type === 'INIT_OK') p.resolve({ runtime: msg.runtime });
+        else p.reject(new MirageInitError(msg.error));
+        return;
+      }
+
+      if (msg.type === 'INIT_WHISTLE_OK' || msg.type === 'INIT_WHISTLE_ERR') {
+        const p = this.pendingWhistleInit;
+        if (!p || p.requestId !== msg.requestId) return;
+        window.clearTimeout(p.timer);
+        this.pendingWhistleInit = null;
+        if (msg.type === 'INIT_WHISTLE_OK') p.resolve();
+        else p.reject(new MirageInitError(msg.error));
         return;
       }
 
@@ -200,36 +288,50 @@ export class MirageService {
         } else {
           p.reject(new MirageInferenceError(msg.error));
         }
+        return;
+      }
+
+      if (msg.type === 'TRANSCRIBE_OK' || msg.type === 'TRANSCRIBE_ERR') {
+        const p = this.pendingTranscribe;
+        if (!p || p.requestId !== msg.requestId) return;
+        window.clearTimeout(p.timer);
+        this.pendingTranscribe = null;
+        if (msg.type === 'TRANSCRIBE_OK') p.resolve(msg.text);
+        else p.reject(new Error(msg.error));
       }
     };
 
     worker.onerror = (err) => {
-      const message = err.message || 'Cactus Mirage worker crashed.';
-      if (this.pendingInit) {
-        window.clearTimeout(this.pendingInit.timer);
-        const p = this.pendingInit;
-        this.pendingInit = null;
-        p.reject(new MirageInitError(message));
-      }
-      if (this.pendingDescribe) {
-        window.clearTimeout(this.pendingDescribe.timer);
-        const p = this.pendingDescribe;
-        this.pendingDescribe = null;
-        p.reject(new MirageInferenceError(message));
+      const message = err.message || 'Cactus worker crashed.';
+      for (const pending of [
+        this.pendingInit,
+        this.pendingWhistleInit,
+        this.pendingDescribe,
+        this.pendingTranscribe,
+      ]) {
+        if (pending) {
+          window.clearTimeout(pending.timer);
+          pending.reject(new MirageInferenceError(message));
+        }
       }
       this.terminate();
     };
   }
 
   terminate(): void {
-    if (this.pendingInit) {
-      window.clearTimeout(this.pendingInit.timer);
-      this.pendingInit = null;
+    for (const pending of [
+      this.pendingInit,
+      this.pendingWhistleInit,
+      this.pendingDescribe,
+      this.pendingTranscribe,
+    ]) {
+      if (pending) window.clearTimeout(pending.timer);
     }
-    if (this.pendingDescribe) {
-      window.clearTimeout(this.pendingDescribe.timer);
-      this.pendingDescribe = null;
-    }
+    this.pendingInit = null;
+    this.pendingWhistleInit = null;
+    this.pendingDescribe = null;
+    this.pendingTranscribe = null;
+
     if (this.worker) {
       this.worker.onmessage = null;
       this.worker.onerror = null;
@@ -237,6 +339,7 @@ export class MirageService {
       this.worker = null;
     }
     this.ready = false;
+    this.whistleReady = false;
     this.busy = false;
   }
 }

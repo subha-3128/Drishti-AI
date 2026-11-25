@@ -28,6 +28,7 @@ export interface CameraCallbacks {
 
 const TARGET_WIDTH = 640;
 const TARGET_HEIGHT = 480;
+const CAPTURE_MAX_WIDTH = 320;
 const FREEZE_TIMEOUT_MS = 3000;
 
 export class CameraManager {
@@ -183,8 +184,9 @@ export class CameraManager {
       if (!this.canvas) {
         this.canvas = document.createElement('canvas');
       }
-      this.canvas.width = videoElement.videoWidth;
-      this.canvas.height = videoElement.videoHeight;
+      const captureScale = Math.min(1, CAPTURE_MAX_WIDTH / videoElement.videoWidth);
+      this.canvas.width = Math.max(1, Math.round(videoElement.videoWidth * captureScale));
+      this.canvas.height = Math.max(1, Math.round(videoElement.videoHeight * captureScale));
       this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
 
       this.lastVideoTime = videoElement.currentTime;
@@ -218,8 +220,11 @@ export class CameraManager {
       return null;
     }
 
-    const width = this.video.videoWidth || TARGET_WIDTH;
-    const height = this.video.videoHeight || TARGET_HEIGHT;
+    const srcW = this.video.videoWidth || TARGET_WIDTH;
+    const srcH = this.video.videoHeight || TARGET_HEIGHT;
+    const scale = Math.min(1, CAPTURE_MAX_WIDTH / srcW);
+    const width = Math.max(1, Math.round(srcW * scale));
+    const height = Math.max(1, Math.round(srcH * scale));
     if (this.canvas.width !== width || this.canvas.height !== height) {
       this.canvas.width = width;
       this.canvas.height = height;

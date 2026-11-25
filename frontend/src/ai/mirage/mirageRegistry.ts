@@ -36,19 +36,19 @@ export const MIRAGE_HAZARD_CATEGORIES: Record<string, HazardCategoryConfig> = {
 };
 
 const EXACT_OR_PHRASE_MAP: Array<[RegExp, string]> = [
-  [/\b(person|pedestrian|people|man|woman|child|player|walker|runner)\b/, 'person'],
-  [/\b(crowd|group of people)\b/, 'crowd'],
-  [/\b(motorcycle|motorbike|scooter|moped|two-wheeler)\b/, 'motorcycle'],
-  [/\b(bicycle|bike|cyclist)\b/, 'bicycle'],
-  [/\b(bus)\b/, 'bus'],
-  [/\b(pickup truck|truck|lorry)\b/, 'truck'],
-  [/\b(car|sedan|suv|taxi|cab|vehicle|van)\b/, 'vehicle'],
-  [/\b(dog|puppy)\b/, 'dog'],
-  [/\b(cow|bull|cattle|calf)\b/, 'cow'],
-  [/\b(stairs|staircase|steps)\b/, 'stairs'],
-  [/\b(barricade|barrier|fence|railing|guardrail|cone)\b/, 'barrier'],
-  [/\b(pillar|pole|post|bollard|bench|chair|table|suitcase|bag|cart)\b/, 'obstacle'],
-  [/\b(tree|bush)\b/, 'tree'],
+  [/\b(persons?|pedestrians?|people|man|men|woman|women|child|children|players?|walkers?|runners?)\b/, 'person'],
+  [/\b(crowds?|group of people)\b/, 'crowd'],
+  [/\b(motorcycles?|motorbikes?|scooters?|mopeds?|two-wheelers?)\b/, 'motorcycle'],
+  [/\b(bicycles?|bikes?|cyclists?)\b/, 'bicycle'],
+  [/\b(bus|buses)\b/, 'bus'],
+  [/\b(pickup trucks?|trucks?|lorr(?:y|ies))\b/, 'truck'],
+  [/\b(cars?|sedans?|suvs?|taxis?|cabs?|vehicles?|vans?)\b/, 'vehicle'],
+  [/\b(dogs?|pupp(?:y|ies))\b/, 'dog'],
+  [/\b(cows?|bulls?|cattle|calves)\b/, 'cow'],
+  [/\b(stairs?|staircases?|steps?)\b/, 'stairs'],
+  [/\b(barricades?|barriers?|fences?|railings?|guardrails?|cones?)\b/, 'barrier'],
+  [/\b(pillars?|poles?|posts?|bollards?|bench(?:es)?|chairs?|tables?|suitcases?|bags?|carts?)\b/, 'obstacle'],
+  [/\b(trees?|bush(?:es)?)\b/, 'tree'],
 ];
 
 /**

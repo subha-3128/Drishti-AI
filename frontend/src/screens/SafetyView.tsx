@@ -39,9 +39,10 @@ export function SafetyView() {
           suspends the browser camera and stops detection. Keep the app in the foreground.
         </li>
         <li>
-          <strong>Offline Voice Limitation:</strong> Speech output uses your browser&apos;s Web
-          Speech API; offline availability depends on OS-installed voices. Offline voice commands
-          via Cactus Whistle are planned for a future release.
+          <strong>Offline Voice Output &amp; Commands:</strong> Speech output uses your browser&apos;s
+          Web Speech API (plus stereo directional audio cues via Web Audio API), while optional
+          hands-free voice commands run offline via <strong>Cactus Whistle</strong> (<code>whistle.cact</code>)
+          when enabled in Settings.
         </li>
       </ul>
 

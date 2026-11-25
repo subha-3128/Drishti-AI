@@ -79,5 +79,11 @@ describe('Model Cache & Integrity', () => {
     const parsedPublic = JSON.parse(publicManifest);
     expect(parsedPublic).toEqual(JSON.parse(rootManifest));
     expect(validateManifest(parsedPublic)).toBe(true);
+    expect(
+      validateManifest({
+        manifestVersion: '2.0.0',
+        models: [{ id: 'x', name: 'x', url: '/x', fileSizeBytes: 1, sha256: 'z'.repeat(64) }],
+      })
+    ).toBe(false);
   });
 });

@@ -144,5 +144,31 @@ describe('Cactus Mirage WASM Validation & Benchmark', () => {
     expect(personAdapted.some((d) => d.classId === 'person')).toBe(true);
     expect(JSON.parse(streetRes.text).objects.length).toBeGreaterThan(0);
     expect(blankAdapted).toHaveLength(0);
+
+    // Co-load Cactus Whistle in the same WASM runtime and verify bitmask + silent audio transcribe.
+    const whistlePath = path.resolve(__dirname, '../../public/models/whistle.cact');
+    const whistleBytes = fs.readFileSync(whistlePath);
+    const wPtr = mod._malloc(whistleBytes.length);
+    mod.HEAPU8.set(whistleBytes, wPtr);
+    const wRc = mod._cactus_load(wPtr, BigInt(whistleBytes.length));
+    mod._free(wPtr);
+    expect(wRc).toBe(0);
+    expect(mod._cactus_models() & 6).toBe(6);
+
+    const pcm = new Float32Array(16000).fill(0);
+    const pcmPtr = mod._malloc(pcm.byteLength);
+    new Float32Array(mod.HEAPU8.buffer, pcmPtr, pcm.length).set(pcm);
+    const wOutPtr = mod._malloc(4096);
+    const tRc = mod.ccall(
+      'cactus_transcribe',
+      'number',
+      ['number', 'number', 'string', 'string', 'number', 'number', 'number'],
+      [pcmPtr, pcm.length, 'en', 'repeat\npause\nresume', 0, wOutPtr, 4096]
+    );
+    const wJson = JSON.parse(mod.UTF8ToString(wOutPtr)) as { text?: string };
+    mod._free(pcmPtr);
+    mod._free(wOutPtr);
+    expect(tRc).toBeGreaterThanOrEqual(0);
+    expect(typeof wJson.text).toBe('string');
   }, 60000);
 });

@@ -33,5 +33,9 @@ jobs:
       - name: Run Vitest suite
         run: npm test
 
-      - name: Build production PWA
-        run: npm run build
+      - name: Build production PWA & sync Capacitor
+        run: npm run cap:sync
+
+      - name: Run dataset validator tests
+        working-directory: .
+        run: python3 -m unittest discover -s ai-training/scripts -p "test_*.py"
