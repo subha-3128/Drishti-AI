@@ -1,30 +1,50 @@
 {
-  "manifestVersion": "1.0.0",
+  "manifestVersion": "2.0.0",
+  "runtime": {
+    "name": "Cactus Compute WebAssembly",
+    "version": "4.1.4",
+    "sourceCommit": "a224d3629bad90d1a0d7792183cea12cdd1fb75e",
+    "license": "Apache-2.0",
+    "files": [
+      {
+        "url": "/cactus/cactus.js",
+        "fileSizeBytes": 62359,
+        "sha256": "707341e44776ab0eb8dfc8f6a579ed5ac41e2ffc6419a18012f61619a6dfc70c"
+      },
+      {
+        "url": "/cactus/cactus.wasm",
+        "fileSizeBytes": 1274011,
+        "sha256": "fae56a5aae883224e8b196d2bc2fcd6ba1db5347ed2fcfd733f545775c7d3be0"
+      }
+    ]
+  },
   "models": [
     {
-      "id": "yolox-nano-coco",
-      "name": "YOLOX-Nano (COCO Pretrained)",
-      "version": "0.1.1rc0",
-      "task": "object-detection",
-      "url": "/models/yolox_nano.onnx",
-      "fileSizeBytes": 3659407,
-      "sha256": "c789161ed43c8269fcd4e67c67eeeb4e80c622da2eb296a20bc6007bd18a0b7d",
-      "source": "https://github.com/Megvii-BaseDetection/YOLOX/releases/download/0.1.1rc0/yolox_nano.onnx",
+      "id": "cactus-mirage-v1",
+      "name": "Cactus Mirage",
+      "version": "4.1.4",
+      "task": "vision-object-detection",
+      "url": "/models/mirage.cact",
+      "fileSizeBytes": 21611043,
+      "sha256": "4249a0f7515272ff76b9414bec17d7e7daf84b15b66c7fb4f17fce1e66f9f237",
+      "source": "https://huggingface.co/Cactus-Compute/mirage",
       "license": "Apache-2.0",
-      "inputSize": [416, 416],
-      "runtime": "onnxruntime-web",
+      "inputSize": [320, 240],
+      "runtime": "cactus-wasm",
       "supportedClasses": [
         "person",
-        "bicycle",
-        "car",
+        "crowd",
+        "vehicle",
         "motorcycle",
+        "bicycle",
         "bus",
         "truck",
         "dog",
         "cow",
-        "bench",
-        "chair",
-        "suitcase"
+        "stairs",
+        "barrier",
+        "obstacle",
+        "tree"
       ],
       "status": "bundled"
     }

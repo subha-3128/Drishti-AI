@@ -1,5 +1,5 @@
-import { getActiveHazardConfig, HazardPriority } from '../../ai/detection/classRegistry';
-import { computeIoU, RawDetection } from '../../ai/detection/yoloxCodec';
+import { computeIoU, MirageDetection, NormalizedBBox } from '../../ai/mirage/mirageAdapter';
+import { HazardPriority, MIRAGE_HAZARD_CATEGORIES } from '../../ai/mirage/mirageRegistry';
 import { estimateDirection, formatDirectionPhrase, HazardDirection } from '../direction/directionEstimator';
 
 export interface HazardAlert {
@@ -15,7 +15,7 @@ export interface HazardAlert {
 interface TrackedObject {
   trackId: number;
   classId: string;
-  bbox: RawDetection['bbox'];
+  bbox: NormalizedBBox;
   seenCount: number;
   lastSeenAt: number;
   lastAlertedAt: number;
@@ -34,6 +34,10 @@ const PRIORITY_RANK: Record<HazardPriority, number> = {
   P3: 3,
 };
 
+/**
+ * Interprets validated Cactus Mirage detections into prioritized spoken alerts.
+ * Strictly avoids inventing distances or approaching-motion claims.
+ */
 export class HazardEngine {
   private tracks: TrackedObject[] = [];
   private nextTrackId = 1;
@@ -44,7 +48,7 @@ export class HazardEngine {
     this.options = {
       minConfidence: options.minConfidence,
       cooldownMs: options.cooldownMs,
-      trackExpiryMs: options.trackExpiryMs ?? 1500,
+      trackExpiryMs: options.trackExpiryMs ?? 3500,
     };
   }
 
@@ -58,8 +62,7 @@ export class HazardEngine {
     this.recentClassDirectionAlerts.clear();
   }
 
-  processDetections(detections: RawDetection[], now: number): HazardAlert[] {
-    // Expire stale tracks and stale cooldown keys
+  processDetections(detections: MirageDetection[], now: number): HazardAlert[] {
     this.tracks = this.tracks.filter((t) => now - t.lastSeenAt <= this.options.trackExpiryMs);
     for (const [key, ts] of this.recentClassDirectionAlerts.entries()) {
       if (now - ts > this.options.cooldownMs * 2) {
@@ -71,31 +74,33 @@ export class HazardEngine {
 
     for (const det of detections) {
       if (det.confidence < this.options.minConfidence) continue;
-      const cfg = getActiveHazardConfig(det.classId);
-      if (!cfg) continue;
+      const cfg = MIRAGE_HAZARD_CATEGORIES[det.classId];
+      if (!cfg || !cfg.enabled) continue;
 
       const area = (det.bbox.x2 - det.bbox.x1) * (det.bbox.y2 - det.bbox.y1);
-      // Suppress tiny distant background detections to reduce false-positive alert fatigue.
-      if (area < 0.012 && !(cfg.basePriority === 'P0' && det.confidence >= 0.75)) {
+      if (area < 0.012 && !(cfg.category === 'dynamic' && det.confidence >= 0.78)) {
         continue;
       }
 
       const track = this.matchOrCreateTrack(det, now);
       const direction = estimateDirection(det.bbox, det.confidence);
-      const priority = this.computePriority(cfg.basePriority, det.bbox, direction);
+      const priority = this.computePriority(cfg.basePriority, det.bbox, direction, area);
 
-      // Temporal validation: require >=2 frames unless high-confidence close P0 hazard.
-      const immediateP0 = priority === 'P0' && det.confidence >= 0.65 && area >= 0.12;
-      if (track.seenCount < 2 && !immediateP0) {
+      // Temporal validation: require >=2 observations unless large obstacle directly in close walking path.
+      const immediateClosePath =
+        (direction === 'center' || direction === 'ahead') &&
+        area >= 0.25 &&
+        det.bbox.y2 >= 0.8 &&
+        det.confidence >= 0.65;
+
+      if (track.seenCount < 2 && !immediateClosePath) {
         continue;
       }
 
-      // Per-track cooldown
       if (track.lastAlertedAt > 0 && now - track.lastAlertedAt < this.options.cooldownMs) {
         continue;
       }
 
-      // Per-(class + direction) cooldown to prevent duplicate speech when tracks re-id
       const classDirKey = `${det.classId}:${direction}`;
       const lastClassAlert = this.recentClassDirectionAlerts.get(classDirKey) ?? 0;
       if (lastClassAlert > 0 && now - lastClassAlert < this.options.cooldownMs) {
@@ -118,7 +123,6 @@ export class HazardEngine {
 
     alerts.sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority]);
 
-    // If a P0 critical alert is present, suppress lower-priority P2/P3 alerts in the same frame.
     if (alerts.some((a) => a.priority === 'P0')) {
       return alerts.filter((a) => a.priority === 'P0' || a.priority === 'P1');
     }
@@ -126,7 +130,7 @@ export class HazardEngine {
     return alerts.slice(0, 2);
   }
 
-  private matchOrCreateTrack(det: RawDetection, now: number): TrackedObject {
+  private matchOrCreateTrack(det: MirageDetection, now: number): TrackedObject {
     let bestTrack: TrackedObject | null = null;
     let bestIoU = 0.25;
 
@@ -160,14 +164,14 @@ export class HazardEngine {
 
   private computePriority(
     base: HazardPriority,
-    bbox: RawDetection['bbox'],
-    direction: HazardDirection
+    bbox: NormalizedBBox,
+    direction: HazardDirection,
+    area: number
   ): HazardPriority {
-    const area = (bbox.x2 - bbox.x1) * (bbox.y2 - bbox.y1);
     const inPath = direction === 'center' || direction === 'ahead';
 
-    // Large obstacle close to lower-center walking path escalates urgency.
-    if (inPath && area >= 0.2 && bbox.y2 >= 0.75) {
+    // P0 reserved for large obstacles filling the immediate lower-center walking path.
+    if (inPath && area >= 0.25 && bbox.y2 >= 0.8) {
       return 'P0';
     }
     if (base === 'P2' && inPath && area >= 0.1) {

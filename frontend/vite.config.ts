@@ -7,11 +7,11 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/drishti-icon.svg', 'models/*'],
+      includeAssets: ['icons/drishti-icon.svg', 'models/*', 'cactus/*'],
       manifest: {
         name: 'Drishti AI — दृष्टि',
         short_name: 'Drishti AI',
-        description: 'See the path. Hear the world. Offline-capable assistive navigation for pedestrians.',
+        description: 'See the path. Hear the world. Offline-capable assistive navigation powered by Cactus Mirage.',
         theme_color: '#0369A1',
         background_color: '#0F172A',
         display: 'standalone',
@@ -26,14 +26,12 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,wasm,onnx,json}'],
+        globPatterns: ['**/*.{js,mjs,css,html,svg,json}', 'cactus/*.{js,wasm}', 'models/*.{cact,json}'],
+        cleanupOutdatedCaches: true,
         maximumFileSizeToCacheInBytes: 30 * 1024 * 1024,
       },
     }),
   ],
-  optimizeDeps: {
-    exclude: ['onnxruntime-web'],
-  },
   worker: {
     format: 'es',
   },

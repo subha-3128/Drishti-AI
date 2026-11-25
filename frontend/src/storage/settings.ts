@@ -15,7 +15,7 @@ export const DEFAULT_SETTINGS: DrishtiSettings = {
   speechRate: 1.05,
   speechVolume: 1.0,
   hapticsEnabled: true,
-  minConfidence: 0.45,
+  minConfidence: 0.4,
   cooldownMs: 4500,
   theme: 'high-contrast-dark',
   onboardingCompleted: false,

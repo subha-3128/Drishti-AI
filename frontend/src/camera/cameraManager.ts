@@ -15,6 +15,12 @@ export interface CapturedFrame {
   timestamp: number;
 }
 
+export interface CameraInfo {
+  facingMode: string;
+  width: number;
+  height: number;
+}
+
 export interface CameraCallbacks {
   onStatusChange: (status: CameraStatus, detail?: string) => void;
   onError: (message: string) => void;
@@ -34,6 +40,7 @@ export class CameraManager {
   private lastVideoTime = -1;
   private lastFrameProgressAt = 0;
   private freezeTimerId: number | null = null;
+  private cameraInfo: CameraInfo = { facingMode: 'unknown', width: 0, height: 0 };
   private callbacks: CameraCallbacks;
 
   constructor(callbacks: CameraCallbacks) {
@@ -44,13 +51,19 @@ export class CameraManager {
     return this.status;
   }
 
+  getCameraInfo(): CameraInfo {
+    return { ...this.cameraInfo };
+  }
+
   private setStatus(status: CameraStatus, detail?: string): void {
     this.status = status;
     this.callbacks.onStatusChange(status, detail);
   }
 
-  async start(videoElement: HTMLVideoElement): Promise<boolean> {
-    // Prevent duplicate concurrent camera sessions.
+  async start(videoElement: HTMLVideoElement, signal?: AbortSignal): Promise<boolean> {
+    if (signal?.aborted) {
+      return false;
+    }
     if (this.startingPromise) {
       return this.startingPromise;
     }
@@ -58,7 +71,7 @@ export class CameraManager {
       return true;
     }
 
-    this.startingPromise = this.startInternal(videoElement);
+    this.startingPromise = this.startInternal(videoElement, signal);
     try {
       return await this.startingPromise;
     } finally {
@@ -66,14 +79,14 @@ export class CameraManager {
     }
   }
 
-  private async startInternal(videoElement: HTMLVideoElement): Promise<boolean> {
+  private async startInternal(videoElement: HTMLVideoElement, signal?: AbortSignal): Promise<boolean> {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       this.setStatus('unavailable', 'Camera API is not supported in this browser.');
       this.callbacks.onError('Camera is not supported in this browser.');
       return false;
     }
 
-    this.stop();
+    this.stopStreamOnly();
     this.video = videoElement;
     this.setStatus('requesting_permission');
 
@@ -88,6 +101,12 @@ export class CameraManager {
         },
       });
 
+      if (signal?.aborted) {
+        for (const t of stream.getTracks()) t.stop();
+        this.setStatus('idle');
+        return false;
+      }
+
       this.stream = stream;
       this.setStatus('starting');
 
@@ -98,6 +117,13 @@ export class CameraManager {
         this.callbacks.onError('No camera video track found.');
         return false;
       }
+
+      const settings = track.getSettings();
+      const actualFacing = settings.facingMode ?? 'unknown';
+      const facingWarning =
+        actualFacing !== 'unknown' && actualFacing !== 'environment'
+          ? `Non-rear camera active (${actualFacing})`
+          : undefined;
 
       track.onended = () => {
         if (this.status === 'active' || this.status === 'starting') {
@@ -117,6 +143,11 @@ export class CameraManager {
 
       await videoElement.play();
 
+      if (signal?.aborted) {
+        this.stop();
+        return false;
+      }
+
       if (videoElement.videoWidth === 0 || videoElement.videoHeight === 0) {
         await new Promise<void>((resolve) => {
           const onMeta = () => {
@@ -131,12 +162,23 @@ export class CameraManager {
         });
       }
 
+      if (signal?.aborted) {
+        this.stop();
+        return false;
+      }
+
       if (videoElement.videoWidth === 0 || videoElement.videoHeight === 0) {
         this.stop();
         this.setStatus('unavailable', 'Camera stream produced zero-dimension frames.');
         this.callbacks.onError('Camera started without valid video frames.');
         return false;
       }
+
+      this.cameraInfo = {
+        facingMode: actualFacing,
+        width: videoElement.videoWidth,
+        height: videoElement.videoHeight,
+      };
 
       if (!this.canvas) {
         this.canvas = document.createElement('canvas');
@@ -149,10 +191,13 @@ export class CameraManager {
       this.lastFrameProgressAt = performance.now();
       this.startFreezeMonitor();
 
-      this.setStatus('active');
+      this.setStatus('active', facingWarning);
       return true;
     } catch (err) {
       this.stop();
+      if (signal?.aborted) {
+        return false;
+      }
       const name = err instanceof DOMException ? err.name : '';
       if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
         this.setStatus('permission_denied', 'Camera permission was denied.');
@@ -165,10 +210,6 @@ export class CameraManager {
     }
   }
 
-  /**
-   * Captures the newest frame synchronously. Returns null if camera is not ready.
-   * Callers should only invoke this when the AI worker is idle so stale frames are dropped.
-   */
   captureNewestFrame(): CapturedFrame | null {
     if (this.status !== 'active' || !this.video || !this.canvas || !this.ctx) {
       return null;
@@ -249,6 +290,7 @@ export class CameraManager {
   stop(): void {
     this.stopStreamOnly();
     this.video = null;
+    this.cameraInfo = { facingMode: 'unknown', width: 0, height: 0 };
     if (this.status !== 'idle') {
       this.setStatus('idle');
     }

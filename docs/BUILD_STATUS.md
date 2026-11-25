@@ -1,7 +1,7 @@
 # Drishti AI — Build Status
 
 > **Last Updated:** 2026-11-25  
-> **Selected Platform:** Option B — React + TypeScript + Vite PWA + ONNX Runtime Web
+> **Selected Platform:** Option B — React + TypeScript + Vite PWA + Cactus Compute WebAssembly (`4.1.4`)
 
 ## Environment Inspection
 - **OS:** macOS 26.7.3 (`arm64`, 8 GB RAM)
@@ -9,33 +9,28 @@
 - **Python:** `3.14.8`
 - **Android Tooling:** Not installed (`gradle`, `adb`, `sdkmanager`, `ANDROID_HOME` absent)
 
+## Vision AI Architecture (Cactus Mirage Only)
+- **Sole Vision Model:** **Cactus Mirage** (`mirage.cact`, 21,611,043 bytes, SHA-256 `4249a0f7515272ff76b66c7fb4f17fce1e66f9f237`, Apache-2.0).
+- **Runtime:** Official Cactus Compute `4.1.4` WebAssembly (`cactus.js` + `cactus.wasm`, commit `a224d3629bad90d1a0d7792183cea12cdd1fb75e`, Apache-2.0) running in `frontend/src/workers/mirage.worker.ts`.
+- **YOLOX-Nano & ONNX Runtime Web:** Completely removed (package, `.onnx` model, `/ort/` WASM binaries, workers, codecs, and tests).
+- **Planned Future Feature:** Cactus Whistle for offline voice commands.
+
 ## Milestone Tracker
-- [x] **Milestone 1:** Project foundation (`frontend/`, `ai-models/`, `ai-training/`, `docs/`, Vite + TypeScript + PWA build)
-- [x] **Milestone 2:** UI & Accessibility (Onboarding, Home, Settings, Safety, high-contrast dark/light themes, `aria-live`, Phosphor SVG icons, 48px+ touch targets)
-- [x] **Milestone 3:** Camera Subsystem (`CameraManager` rear camera, newest-frame capture, freeze & interruption detection, `visibilitychange` pause)
-- [x] **Milestone 4:** AI Infrastructure (`model-manifest.json`, SHA-256 `modelCache.ts`, `inference.worker.ts` with ONNX Runtime Web WebGPU/WASM, local `/ort/` WASM binaries)
-- [x] **Milestone 5:** First Real Detector (`yolox_nano.onnx` Apache-2.0 COCO model, `yoloxCodec.ts` letterbox + decode + NMS, `classRegistry.ts`)
-- [x] **Milestone 6:** Hazard Engine (`directionEstimator.ts`, `hazardEngine.ts` with IoU tracking, temporal validation, P0–P3 priority, cooldowns)
-- [x] **Milestone 7:** Voice Alerts (`voiceEngine.ts` Web Speech API priority queue with P0/P1 preemption & haptics)
-- [x] **Milestone 8:** Offline Operation (`vite-plugin-pwa` precache + Cache API SHA-256 model storage)
-- [x] **Milestone 9:** Hazard-Specific Training Workspace (`ai-training/scripts/validate_yolo_dataset.py`, `DATASET_GUIDE.md`, `MODEL_TRAINING.md`)
-- [x] **Milestone 10:** Extensibility (Modular `ai/` and `safety/` boundaries ready for future segmentation/depth)
-- [x] **Milestone 11:** Unit & UI Tests (Vitest suite covering state machine, direction, hazard engine, YOLOX codec, manifest validation, and accessible UI)
-- [x] **Milestone 12:** Finalization (`tsc -b && vite build`, documentation complete)
+- [x] **Milestone 1:** Project foundation & Mirage-only architecture
+- [x] **Milestone 2:** UI & Accessibility (Onboarding, Home, Settings, Safety, high-contrast dark/light themes, `aria-live`, Phosphor SVG icons)
+- [x] **Milestone 3:** Camera Subsystem (`CameraManager` rear camera, `AbortSignal` cancellation, `facingMode` check, freeze/interruption detection)
+- [x] **Milestone 4:** Cactus Mirage WASM Worker (`mirage.worker.ts`, `mirageService.ts`, `mirageAdapter.ts`, `mirageRegistry.ts`, SHA-256 `modelCache.ts`)
+- [x] **Milestone 5:** Hazard Engine & Voice Alerts (`hazardEngine.ts`, `directionEstimator.ts`, `voiceEngine.ts` with `voiceschanged` & watchdog)
+- [x] **Milestone 6:** Offline PWA (`vite-plugin-pwa` precaching app shell + `cactus.js`/`cactus.wasm` + `mirage.cact`, 16 entries / ~22.7 MB)
+- [x] **Milestone 7:** Automated Tests & CI (10 Vitest files / 23 tests passing, GitHub Actions CI)
 
-## Model Availability
-- **Active Model:** `yolox_nano.onnx` (Megvii YOLOX-Nano, Apache-2.0, 3.66 MB, SHA-256 `c789161ed43c8269fcd4e67c67eeeb4e80c622da2eb296a20bc6007bd18a0b7d`)
-- **Active Classes:** `person`, `bicycle`, `car`, `motorcycle`, `bus`, `truck`, `dog`, `cow`, `bench`, `chair`, `suitcase`
-- **Disabled Pending Custom Training:** `pothole`, `open_drain`, `open_manhole`, `broken_footpath`, `auto_rickshaw`
-
-## Milestone 2 Validation & Hardening (2026-11-25)
-- **Real ONNX Inference Verified:** Tested `yolox_nano.onnx` via `onnxruntime-web` on `dog.jpg` (320×240 RGBA fixture); detected `dog` (0.86), `bicycle` (0.85), `car` (0.69), `truck` (0.59) in ~86 ms. Added cross-class overlap NMS (`IoU > 0.65`) to prevent duplicate vehicle alerts.
-- **Worker & Camera Hardening:** Added 5s inference / 20s init timeouts in `detectorClient.ts`, zero-copy `ArrayBuffer` transfer, and `loadedmetadata` zero-dimension frame guard in `cameraManager.ts`.
-- **Cache & Voice Hardening:** Added `fileSizeBytes` + offline error handling in `modelCache.ts`, and `getAvailability()` voice-count check in `voiceEngine.ts`.
-- **Hazard Engine Hardening:** Added tiny distant background suppression (`area < 0.012`) and cooldown-map pruning.
-- **Device Validation:** Step-by-step Android checklist added in `docs/DEVICE_VALIDATION.md`.
+## Model & Class Coverage
+- **Enabled Classes (Mirage-mapped):** `person`, `crowd`, `vehicle`, `motorcycle`, `bicycle`, `bus`, `truck`, `dog`, `cow`, `stairs`, `barrier`, `obstacle`, `tree`.
+- **Disabled Pending Indian Dataset Evaluation:** `pothole`, `open_drain`, `open_manhole`, `broken_footpath`, `auto_rickshaw`.
 
 ## Known Limitations & Unverified Items
+- **Mirage Inference Latency:** Measured **987 ms median / 4,503 ms p95** (~1 FPS) in Node WASM; real mobile Chrome latency, battery, and thermal behavior remain unverified on physical Android hardware.
 - **PWA Background/Screen-Lock:** Browser suspends camera and Web Workers when locked or backgrounded.
 - **Offline TTS:** `window.speechSynthesis` relies on OS-installed voices.
-- **Unverified on Physical Mobile Device:** Live rear-camera + offline airplane-mode browser test on an Android phone has not yet been executed in this desktop session.
+- **Indian Hazards:** No Indian pedestrian hazard dataset evaluated yet; custom Indian hazard classes remain disabled.
+- **Root `LICENSE` File:** Not yet created; awaiting user's license choice.

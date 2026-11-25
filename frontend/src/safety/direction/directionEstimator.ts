@@ -1,4 +1,4 @@
-import { RawDetection } from '../../ai/detection/yoloxCodec';
+import { NormalizedBBox } from '../../ai/mirage/mirageAdapter';
 
 export type HazardDirection = 'left' | 'center' | 'right' | 'ahead';
 
@@ -9,11 +9,10 @@ const CORRIDOR_RIGHT = 0.66;
  * Estimates direction relative to the user's forward walking corridor.
  * Avoids guessing left/right when the object spans wide or confidence is low.
  */
-export function estimateDirection(bbox: RawDetection['bbox'], confidence: number): HazardDirection {
+export function estimateDirection(bbox: NormalizedBBox, confidence: number): HazardDirection {
   const width = bbox.x2 - bbox.x1;
   const centerX = (bbox.x1 + bbox.x2) / 2;
 
-  // Low directional confidence or very wide obstacle -> report "ahead" rather than guessing.
   if (confidence < 0.4 || width > 0.65) {
     return 'ahead';
   }

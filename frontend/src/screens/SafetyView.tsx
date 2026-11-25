@@ -18,19 +18,21 @@ export function SafetyView() {
       <ul>
         <li>Never says &ldquo;The road is safe&rdquo; or &ldquo;You can cross now.&rdquo;</li>
         <li>Never makes traffic-signal or street-crossing decisions.</li>
+        <li>Never announces unverified distances or approaching-motion predictions.</li>
         <li>Never guarantees detection of all obstacles.</li>
       </ul>
 
       <h3>Current Model Coverage &amp; Honest Limits</h3>
       <ul>
         <li>
-          The initial detector uses a pretrained COCO object detection model supporting people,
-          cars, motorcycles, bicycles, buses, trucks, dogs, and cows.
+          Drishti AI runs <strong>Cactus Mirage</strong> (<code>mirage.cact</code> via Cactus
+          WebAssembly) on-device to identify supported obstacles such as people, vehicles,
+          bicycles, dogs, stairs, barriers, and static obstacles.
         </li>
         <li>
-          Custom Indian street hazards (open drains, potholes, broken footpaths, open manholes)
-          are <strong>not</strong> yet active until a dedicated Indian pedestrian dataset model is
-          trained and validated.
+          Custom Indian street hazards (open drains, potholes, broken footpaths, open manholes,
+          auto-rickshaws) are <strong>not</strong> enabled until evaluated and validated on real
+          Indian pedestrian datasets.
         </li>
         <li>
           <strong>PWA Browser Limitation:</strong> Locking the phone screen or switching apps
@@ -38,7 +40,8 @@ export function SafetyView() {
         </li>
         <li>
           <strong>Offline Voice Limitation:</strong> Speech output uses your browser&apos;s Web
-          Speech API; offline availability depends on OS-installed voices.
+          Speech API; offline availability depends on OS-installed voices. Offline voice commands
+          via Cactus Whistle are planned for a future release.
         </li>
       </ul>
 

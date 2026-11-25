@@ -9,11 +9,11 @@ import {
 } from '@phosphor-icons/react';
 import { AppState, transitionAppState } from './app/stateMachine';
 import { CameraManager, CameraStatus } from './camera/cameraManager';
-import { DetectorClient } from './ai/inference/detectorClient';
+import { MirageDetection } from './ai/mirage/mirageAdapter';
+import { MirageInferenceError, MirageService } from './ai/mirage/mirageService';
 import { clearModelCache, isModelCached } from './ai/inference/modelCache';
-import { RawDetection } from './ai/detection/yoloxCodec';
 import { HazardAlert, HazardEngine } from './safety/hazard-engine/hazardEngine';
-import { VoiceEngine } from './voice/voiceEngine';
+import { VoiceAvailability, VoiceEngine } from './voice/voiceEngine';
 import { DrishtiSettings, loadSettings, saveSettings } from './storage/settings';
 import { StatusPanel } from './components/StatusPanel';
 import { OnboardingView } from './screens/OnboardingView';
@@ -21,20 +21,21 @@ import { SettingsView } from './screens/SettingsView';
 import { SafetyView } from './screens/SafetyView';
 
 type Tab = 'home' | 'settings' | 'safety';
+const MIRAGE_MODEL_URL = '/models/mirage.cact';
 
 export default function App() {
   const [settings, setSettings] = useState<DrishtiSettings>(() => loadSettings());
   const [tab, setTab] = useState<Tab>('home');
   const [appState, setAppState] = useState<AppState>('idle');
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>('idle');
-  const [aiStatus, setAiStatus] = useState<string>('Idle (not loaded)');
+  const [aiStatus, setAiStatus] = useState<string>('Idle (Mirage not loaded)');
   const [isOnline, setIsOnline] = useState<boolean>(() =>
     typeof navigator !== 'undefined' ? navigator.onLine : true
   );
   const [modelCached, setModelCached] = useState<boolean>(false);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
   const [lastAlert, setLastAlert] = useState<HazardAlert | null>(null);
-  const [liveDetections, setLiveDetections] = useState<RawDetection[]>([]);
+  const [liveDetections, setLiveDetections] = useState<MirageDetection[]>([]);
   const [inferenceMs, setInferenceMs] = useState<number | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -42,12 +43,18 @@ export default function App() {
   const loopTimerRef = useRef<number | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const appStateRef = useRef<AppState>('idle');
+  const operationIdRef = useRef<number>(0);
+  const startAbortRef = useRef<AbortController | null>(null);
 
   const voiceRef = useRef<VoiceEngine | null>(null);
   if (!voiceRef.current) voiceRef.current = new VoiceEngine();
 
-  const detectorRef = useRef<DetectorClient | null>(null);
-  if (!detectorRef.current) detectorRef.current = new DetectorClient();
+  const [voiceAvailability, setVoiceAvailability] = useState<VoiceAvailability>(() =>
+    voiceRef.current!.getAvailability()
+  );
+
+  const mirageRef = useRef<MirageService | null>(null);
+  if (!mirageRef.current) mirageRef.current = new MirageService();
 
   const hazardEngineRef = useRef<HazardEngine | null>(null);
   if (!hazardEngineRef.current) {
@@ -60,8 +67,11 @@ export default function App() {
   const cameraRef = useRef<CameraManager | null>(null);
   if (!cameraRef.current) {
     cameraRef.current = new CameraManager({
-      onStatusChange: (status) => {
+      onStatusChange: (status, detail) => {
         setCameraStatus(status);
+        if (status === 'active' && detail) {
+          setErrorBanner(detail);
+        }
       },
       onError: (msg) => {
         setErrorBanner(msg);
@@ -94,11 +104,13 @@ export default function App() {
     const onOffline = () => setIsOnline(false);
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
-    isModelCached('/models/yolox_nano.onnx').then(setModelCached).catch(() => {});
+    isModelCached(MIRAGE_MODEL_URL).then(setModelCached).catch(() => {});
+    const unsubVoice = voiceRef.current?.subscribeAvailability(setVoiceAvailability);
 
     return () => {
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
+      unsubVoice?.();
     };
   }, []);
 
@@ -111,6 +123,10 @@ export default function App() {
 
   const stopAssistance = useCallback(
     (spokenAnnouncement = 'Assistance stopped.') => {
+      operationIdRef.current += 1;
+      startAbortRef.current?.abort();
+      startAbortRef.current = null;
+
       if (loopTimerRef.current !== null) {
         window.clearTimeout(loopTimerRef.current);
         loopTimerRef.current = null;
@@ -135,7 +151,6 @@ export default function App() {
     [releaseWakeLock]
   );
 
-  // Stop safely if user locks screen or backgrounds the PWA tab.
   useEffect(() => {
     const onVisibilityChange = () => {
       if (document.hidden && appStateRef.current === 'active') {
@@ -149,18 +164,19 @@ export default function App() {
     };
   }, [stopAssistance]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
+      operationIdRef.current += 1;
+      startAbortRef.current?.abort();
       if (loopTimerRef.current !== null) window.clearTimeout(loopTimerRef.current);
       cameraRef.current?.stop();
-      detectorRef.current?.terminate();
-      voiceRef.current?.stopAll();
+      mirageRef.current?.terminate();
+      voiceRef.current?.dispose();
       releaseWakeLock();
     };
   }, [releaseWakeLock]);
 
-  const drawOverlay = useCallback((detections: RawDetection[]) => {
+  const drawOverlay = useCallback((detections: MirageDetection[]) => {
     const canvas = overlayRef.current;
     const video = videoRef.current;
     if (!canvas || !video) return;
@@ -198,15 +214,15 @@ export default function App() {
     const runFrame = async () => {
       if (appStateRef.current !== 'active') return;
       const cam = cameraRef.current;
-      const det = detectorRef.current;
-      if (!cam || !det) return;
+      const mirage = mirageRef.current;
+      if (!cam || !mirage) return;
 
-      let nextDelayMs = 85; // ~12 FPS max target
-      if (!det.isBusy()) {
+      let nextDelayMs = 150;
+      if (!mirage.isBusy()) {
         const frame = cam.captureNewestFrame();
         if (frame) {
           try {
-            const result = await det.detect(frame.imageData, settings.minConfidence, frame.timestamp);
+            const result = await mirage.detectFrame(frame.imageData, settings.minConfidence, frame.timestamp);
             if (result && appStateRef.current === 'active') {
               setInferenceMs(result.inferenceMs);
               setLiveDetections(result.detections);
@@ -222,13 +238,23 @@ export default function App() {
                 }
               }
 
-              // Pace down on slower devices to prevent UI freeze or overheating
-              if (result.inferenceMs > 300) {
-                nextDelayMs = 250;
+              if (result.inferenceMs > 1200) {
+                nextDelayMs = 300;
               }
             }
           } catch (err) {
-            const msg = err instanceof Error ? err.message : 'AI processing failed.';
+            if (err instanceof MirageInferenceError && err.timedOut && appStateRef.current === 'active') {
+              try {
+                await mirageRef.current?.initialize();
+                if (appStateRef.current === 'active') {
+                  loopTimerRef.current = window.setTimeout(runFrame, 300);
+                  return;
+                }
+              } catch {
+                // Fall through to error handling below.
+              }
+            }
+            const msg = err instanceof Error ? err.message : 'Cactus Mirage processing failed.';
             setErrorBanner(msg);
             voiceRef.current?.speakImmediateSystem('AI processing error. Assistance stopped.');
             stopAssistance('');
@@ -242,10 +268,22 @@ export default function App() {
       }
     };
 
-    loopTimerRef.current = window.setTimeout(runFrame, 60);
+    loopTimerRef.current = window.setTimeout(runFrame, 80);
   }, [drawOverlay, settings.minConfidence, settings.showCameraPreview, stopAssistance]);
 
   const startAssistance = async () => {
+    if (
+      appStateRef.current === 'initializing_models' ||
+      appStateRef.current === 'starting_camera' ||
+      appStateRef.current === 'active'
+    ) {
+      return;
+    }
+
+    const opId = ++operationIdRef.current;
+    const controller = new AbortController();
+    startAbortRef.current = controller;
+
     setErrorBanner(null);
     setTab('home');
 
@@ -253,15 +291,21 @@ export default function App() {
     if (!step1.accepted) return;
     appStateRef.current = step1.nextState;
     setAppState(step1.nextState);
-    setAiStatus('Initializing YOLOX-Nano...');
+    setAiStatus('Initializing Cactus Mirage...');
     voiceRef.current?.enqueue('AI is initializing.', 'P2');
 
     try {
-      const { modelName, provider } = await detectorRef.current!.initialize();
-      setAiStatus(`Ready (${modelName} • ${provider})`);
+      const { modelName, runtime } = await mirageRef.current!.initialize(controller.signal);
+      if (opId !== operationIdRef.current || controller.signal.aborted) {
+        return;
+      }
+      setAiStatus(`Ready (${modelName} • ${runtime})`);
       setModelCached(true);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to load AI model.';
+      if (opId !== operationIdRef.current || controller.signal.aborted) {
+        return;
+      }
+      const msg = err instanceof Error ? err.message : 'Failed to load Cactus Mirage.';
       setAiStatus('Model Error');
       setErrorBanner(msg);
       const errRes = transitionAppState(appStateRef.current, 'model_error');
@@ -277,19 +321,27 @@ export default function App() {
 
     if (!videoRef.current) {
       setErrorBanner('Camera preview element is not mounted.');
+      stopAssistance('');
       return;
     }
 
-    const cameraOk = await cameraRef.current!.start(videoRef.current);
+    const cameraOk = await cameraRef.current!.start(videoRef.current, controller.signal);
+    if (opId !== operationIdRef.current || controller.signal.aborted) {
+      cameraRef.current?.stop();
+      return;
+    }
     if (!cameraOk) {
       return;
     }
 
-    // Request Wake Lock so screen stays on while walking (best-effort)
     if ('wakeLock' in navigator) {
       navigator.wakeLock
         .request('screen')
         .then((sentinel) => {
+          if (opId !== operationIdRef.current || controller.signal.aborted) {
+            sentinel.release().catch(() => {});
+            return;
+          }
           wakeLockRef.current = sentinel;
         })
         .catch(() => {});
@@ -297,8 +349,8 @@ export default function App() {
 
     const activeRes = transitionAppState(appStateRef.current, 'active', {
       cameraRunning: cameraRef.current!.getStatus() === 'active',
-      modelLoaded: detectorRef.current!.isReady(),
-      aiInitialized: detectorRef.current!.isReady(),
+      modelLoaded: mirageRef.current!.isReady(),
+      aiInitialized: mirageRef.current!.isReady(),
     });
 
     if (!activeRes.accepted) {
@@ -314,11 +366,6 @@ export default function App() {
   };
 
   const isRunning = appState === 'active' || appState === 'initializing_models' || appState === 'starting_camera';
-  const voiceAvailability = voiceRef.current?.getAvailability() ?? {
-    supported: false,
-    voiceCount: 0,
-    statusLabel: 'Voice Unavailable',
-  };
 
   return (
     <div className="app-shell">

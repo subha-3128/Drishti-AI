@@ -1,21 +1,27 @@
 # Drishti AI — Testing Report
 
 ## Automated Test Suite (`npm test`)
-All automated tests run via Vitest in `frontend/src/tests/`:
+All tests run via Vitest in `frontend/src/tests/`:
 - `stateMachine.test.ts` — Verifies invalid transitions are blocked and `active` requires camera, model, and AI initialization.
+- `cameraManager.test.ts` — Verifies `AbortSignal` cancellation during `getUserMedia` stops acquired tracks and keeps state `idle`.
+- `mirageService.test.ts` — Verifies unique `requestId` matching, stale-frame dropping while busy, and 10s timeout worker termination.
+- `mirageAdapter.test.ts` — Verifies open-vocabulary Mirage label mapping, `[0..1000]` bbox normalization, class-aware deduplication, malformed JSON errors, and disabled Indian hazards.
 - `directionEstimator.test.ts` — Verifies `left`, `center`, `right`, and `ahead` fallback on wide/low-confidence boxes.
-- `hazardEngine.test.ts` — Verifies temporal validation, per-track cooldowns, `P0` preemption of `P2`/`P3`, and tiny-background suppression.
-- `yoloxCodec.test.ts` — Verifies BGR `[1, 3, 416, 416]` letterboxing, YOLOX grid decoding, disabled Indian classes, and manifest validation.
-- `realInference.test.ts` — Runs **actual** `onnxruntime-web` inference using `yolox_nano.onnx` on `fixtures_dog_320x240.bin` (derived from Megvii YOLOX `dog.jpg`).
-- `voiceEngine.test.ts` — Verifies speech availability reporting (`No OS voices loaded` vs `Voice Unavailable`) and `P0` preemption.
-- `modelCache.test.ts` — Verifies SHA-256 integrity rejection and acceptance.
+- `hazardEngine.test.ts` — Verifies temporal validation, per-track cooldowns, `P0` preemption of `P2`/`P3`, tiny-background suppression, and absence of approaching-motion claims.
+- `cactusMiragePoc.test.ts` — Runs **actual** Cactus `4.1.4` WASM (`cactus.wasm`) + `mirage.cact` across 4 real scenes (320×240 RGB):
+  - `dog.jpg`: `tree` (0.411), `pickup truck` (0.513), `white pickup truck` (0.521), `wooden deck` (0.385), `wooden fence` (0.397), `dog` (0.594) -> adapted to `dog` + `truck` + `barrier` + `tree`.
+  - `messi5.jpg`: `crowd` (0.380), `soccer player` (0.817), `soccer ball` (0.697) -> adapted to `person` + `crowd`.
+  - `leuvenA.jpg` (street/buildings): `window`s (0.555–0.671), `house`s (0.550–0.583).
+  - Uniform gray negative scene: `{"objects":[]}` -> `0` detections.
+  - **Node WASM Measurements:** Init **103 ms**, inference **987 ms median / 4,503 ms p95**, WASM heap **103 MB**, RSS delta **+64 MB** (desktop Node measurement, not a mobile benchmark).
+- `voiceEngine.test.ts` — Verifies speech availability reporting (`Voice Unavailable` / `No OS voices loaded`) and `P0` preemption.
+- `modelCache.test.ts` — Verifies SHA-256 integrity checks and single-source-of-truth sync between `ai-models/model-manifest.json` and `frontend/public/models/model-manifest.json`.
 - `appUi.test.tsx` — Verifies onboarding safety disclaimer gate and accessible `Start Navigation Assistance` controls.
 
-## Real Inference Verification (`dog.jpg` 320×240)
-- **Runtime:** `onnxruntime-web` (Node WASM/CPU)
-- **Measured Inference Latency:** ~86 ms (preprocessing + ONNX run + decode + NMS)
-- **Observed Detections:** `dog` (0.86), `bicycle` (0.85), `car` (0.69), `truck` (0.59).
-- **Fix Applied:** Added cross-class overlap NMS (`IoU > 0.65`) in `yoloxCodec.ts` to prevent duplicate alerts when a single vehicle triggers both `car` and `truck`.
+## Indian Hazard Evaluation
+- **Status:** Not yet evaluated on an Indian pedestrian hazard dataset (no licensed Indian pothole/open-drain dataset is present in the workspace). All Indian-specific hazard classes remain disabled (`enabled: false`) in `mirageRegistry.ts`.
 
-## Hardware-Dependent Tests Still Pending
-- Physical Android rear-camera `getUserMedia` lifecycle, airplane-mode PWA cold start, and offline OS `speechSynthesis` voices (see `docs/DEVICE_VALIDATION.md`).
+## Verification Separation
+- **Automated Tests (`npm test`):** Verified in Node/jsdom.
+- **Desktop Build (`tsc -b && vite build`):** Verified production bundle & Service Worker (`22717.45 KiB`, 16 entries).
+- **Physical Android Verification:** Pending (see `docs/DEVICE_VALIDATION.md`).

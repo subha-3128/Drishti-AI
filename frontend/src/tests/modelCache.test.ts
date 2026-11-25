@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { loadVerifiedModelBytes, sha256Hex } from '../ai/inference/modelCache';
+import fs from 'node:fs';
+import path from 'node:path';
+import { loadVerifiedModelBytes, sha256Hex, validateManifest } from '../ai/inference/modelCache';
 
 describe('Model Cache & Integrity', () => {
   beforeEach(() => {
@@ -28,7 +30,7 @@ describe('Model Cache & Integrity', () => {
         source: 'local',
         license: 'Apache-2.0',
         inputSize: [416, 416],
-        runtime: 'onnxruntime-web',
+        runtime: 'cactus-wasm',
         supportedClasses: ['person'],
         status: 'bundled',
       })
@@ -57,11 +59,25 @@ describe('Model Cache & Integrity', () => {
       source: 'local',
       license: 'Apache-2.0',
       inputSize: [416, 416],
-      runtime: 'onnxruntime-web',
+      runtime: 'cactus-wasm',
       supportedClasses: ['person'],
       status: 'bundled',
     });
 
     expect(loaded.byteLength).toBe(4);
+  });
+
+  it('keeps ai-models/model-manifest.json and frontend/public/models/model-manifest.json in sync', () => {
+    const rootManifest = fs.readFileSync(
+      path.resolve(__dirname, '../../../ai-models/model-manifest.json'),
+      'utf-8'
+    );
+    const publicManifest = fs.readFileSync(
+      path.resolve(__dirname, '../../public/models/model-manifest.json'),
+      'utf-8'
+    );
+    const parsedPublic = JSON.parse(publicManifest);
+    expect(parsedPublic).toEqual(JSON.parse(rootManifest));
+    expect(validateManifest(parsedPublic)).toBe(true);
   });
 });

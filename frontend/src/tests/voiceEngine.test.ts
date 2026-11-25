@@ -11,6 +11,7 @@ describe('Voice Engine', () => {
     expect(engine.getAvailability()).toEqual({
       supported: false,
       voiceCount: 0,
+      ready: false,
       statusLabel: 'Voice Unavailable',
     });
   });

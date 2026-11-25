@@ -1,37 +1,41 @@
 # Drishti AI — Physical Android Device Validation Procedure
 
-> **Purpose:** Verify real-world rear camera, offline PWA caching, ONNX inference, and offline voice alerts on a physical Android phone.
+> **Status:** Physical Android verification has **not yet been performed**. Do not claim mobile compatibility until every item below is executed on real hardware.
 
-## Prerequisites
-- Android phone with Chrome (or Edge) and a working rear camera.
-- Serve the production build over HTTPS (required for `getUserMedia` and Service Workers on mobile, e.g., via `vite preview` behind a local HTTPS tunnel or static host).
+## Verification Separation
+- **Automated Tests (`npm test`):** Verified in Node/jsdom (logic, state machine, Mirage adapter, real `cactus.wasm` + `mirage.cact` inference on static fixtures).
+- **Desktop Verification (`vite build` / `vite preview`):** Verified production bundle & Service Worker precache (`22.7 MB`, 16 entries).
+- **Physical Android Testing:** Required below before any real-world claims.
 
-## Step-by-Step Validation Checklist
+## Step-by-Step Android Validation Checklist
 
-1. **Install PWA**
-   - Open the HTTPS URL in Android Chrome.
-   - Complete the Onboarding Safety Disclaimer.
-   - Tap **Install app** / **Add to Home screen** from Chrome's menu.
-   - **Expected:** App icon appears on home screen; opens in standalone mode.
+1. **PWA Installation**
+   - Serve `frontend/dist` over HTTPS and open in Android Chrome.
+   - Acknowledge the Onboarding Safety Disclaimer.
+   - Tap **Install app** / **Add to Home screen** and launch from the home screen.
+   - **Expected:** Opens in standalone mode.
 
-2. **Initial Online Model Caching**
-   - Tap **Start Assistance** once while online, grant camera permission, and wait until status shows `Ready (YOLOX-Nano...)`.
-   - Tap **Stop Assistance**.
-   - **Expected:** Status panel shows `Offline Readiness: Online • Model Cached`.
+2. **Rear Camera Verification**
+   - Tap **Start Assistance** and grant camera permission.
+   - **Expected:** Rear camera activates; no non-rear camera warning banner appears.
 
-3. **Airplane Mode & Browser Restart**
-   - Enable **Airplane Mode** (Wi-Fi and mobile data OFF).
-   - Force-close the PWA and Chrome completely, then reopen the Drishti AI PWA from the home screen.
-   - **Expected:** App shell loads offline; Status panel shows `Offline • Model Cached`.
+3. **Real Cactus Mirage Inference**
+   - Observe AI status in Status Panel.
+   - **Expected:** Reports `Ready (Cactus Mirage • cactus-wasm)` and detects people, vehicles, bicycles, dogs, stairs, or barriers without UI freeze.
 
-4. **Offline Camera + AI Inference + Voice**
-   - Tap **Start Assistance** while still in Airplane Mode.
-   - Point the rear camera at a person, chair, or parked vehicle.
-   - **Expected:**
-     - Rear camera activates; no network errors.
-     - Bounding box appears (if preview enabled) and spoken alert plays (e.g., `"Person ahead."`).
-     - If Status panel reports `Web Speech (No OS voices loaded)`, install offline English TTS data in Android **Settings → Accessibility → Text-to-speech output**.
+4. **Airplane Mode & Offline Model Loading**
+   - After initial online cache (`Offline Readiness: Online • Model Cached`), enable **Airplane Mode**.
+   - Force-close Chrome and reopen the installed PWA.
+   - **Expected:** App loads offline (`Offline • Model Cached`), starts assistance, and runs Mirage inference without network.
 
-5. **Screen-Lock & Interruption Safety**
-   - While active, lock the phone screen or switch to another app, then unlock.
-   - **Expected:** App pauses assistance, stops camera, and announces `"Camera paused. Navigation assistance unavailable."` Never falsely reports `active`.
+5. **Offline Voice Availability**
+   - Listen for spoken alerts in Airplane Mode.
+   - **Expected:** If Status Panel shows `Web Speech (No OS voices loaded)`, install offline English TTS voices in Android **Settings → Accessibility → Text-to-speech output** and re-test.
+
+6. **Screen Lock, Backgrounding & Camera Interruption**
+   - Lock the screen or switch apps while active, then return.
+   - **Expected:** Assistance pauses immediately, camera stops, and app speaks `"Camera paused. Navigation assistance unavailable."`
+
+7. **Battery & Thermal Behavior**
+   - Run for 10–15 minutes while observing device warmth, `ms/frame` latency, and battery drain.
+   - **Expected:** Controlled 1-in-flight queue prevents inference backlog.
