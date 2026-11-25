@@ -16,6 +16,8 @@ interface TrackedObject {
   trackId: number;
   classId: string;
   bbox: NormalizedBBox;
+  baselineArea: number;
+  firstSeenAt: number;
   seenCount: number;
   lastSeenAt: number;
   lastAlertedAt: number;
@@ -35,8 +37,8 @@ const PRIORITY_RANK: Record<HazardPriority, number> = {
 };
 
 /**
- * Interprets validated Cactus Mirage detections into prioritized spoken alerts.
- * Strictly avoids inventing distances or approaching-motion claims.
+ * Interprets validated detections into prioritized spoken alerts.
+ * Approaching motion is only reported when rapid high-FPS tracking observes >=25% bbox growth.
  */
 export class HazardEngine {
   private tracks: TrackedObject[] = [];
@@ -82,13 +84,23 @@ export class HazardEngine {
         continue;
       }
 
-      const track = this.matchOrCreateTrack(det, now);
+      const prevLastSeen = this.findMatchingTrackLastSeen(det);
+      const track = this.matchOrCreateTrack(det, area, now);
       const direction = estimateDirection(det.bbox, det.confidence);
-      const priority = this.computePriority(cfg.basePriority, det.bbox, direction, area);
 
       const inPath = direction === 'center' || direction === 'ahead';
+      const frameGapOk = prevLastSeen > 0 && now - prevLastSeen <= 600;
+      const isApproaching =
+        cfg.category === 'dynamic' &&
+        inPath &&
+        det.confidence >= 0.55 &&
+        track.seenCount >= 4 &&
+        frameGapOk &&
+        now - track.firstSeenAt >= 200 &&
+        area >= track.baselineArea * 1.25;
+
+      const priority = this.computePriority(cfg.basePriority, det.bbox, direction, area, isApproaching);
       const immediateClosePath = inPath && area >= 0.25 && det.bbox.y2 >= 0.8 && det.confidence >= 0.65;
-      // Avoid 2.5s+ mobile blind spots by alerting immediately on high-confidence dynamic/path obstacles.
       const singleFrameHighConf =
         det.confidence >= 0.65 &&
         area >= 0.045 &&
@@ -98,25 +110,27 @@ export class HazardEngine {
         continue;
       }
 
-      if (track.lastAlertedAt > 0 && now - track.lastAlertedAt < this.options.cooldownMs) {
+      const urgentOverride = isApproaching && priority === 'P0' && now - track.lastAlertedAt >= 1500;
+      if (!urgentOverride && track.lastAlertedAt > 0 && now - track.lastAlertedAt < this.options.cooldownMs) {
         continue;
       }
 
       const classDirKey = `${det.classId}:${direction}`;
       const lastClassAlert = this.recentClassDirectionAlerts.get(classDirKey) ?? 0;
-      if (lastClassAlert > 0 && now - lastClassAlert < this.options.cooldownMs) {
+      if (!urgentOverride && lastClassAlert > 0 && now - lastClassAlert < this.options.cooldownMs) {
         continue;
       }
 
       track.lastAlertedAt = now;
       this.recentClassDirectionAlerts.set(classDirKey, now);
 
+      const verb = isApproaching ? 'approaching ' : '';
       alerts.push({
         id: `${track.trackId}-${now}`,
         classId: det.classId,
         priority,
         direction,
-        message: `${cfg.spokenName} ${formatDirectionPhrase(direction)}.`,
+        message: `${cfg.spokenName} ${verb}${formatDirectionPhrase(direction)}.`,
         confidence: det.confidence,
         timestamp: now,
       });
@@ -131,7 +145,21 @@ export class HazardEngine {
     return alerts.slice(0, 2);
   }
 
-  private matchOrCreateTrack(det: MirageDetection, now: number): TrackedObject {
+  private findMatchingTrackLastSeen(det: MirageDetection): number {
+    let bestIoU = 0.25;
+    let lastSeen = 0;
+    for (const track of this.tracks) {
+      if (track.classId !== det.classId) continue;
+      const iou = computeIoU(track.bbox, det.bbox);
+      if (iou > bestIoU) {
+        bestIoU = iou;
+        lastSeen = track.lastSeenAt;
+      }
+    }
+    return lastSeen;
+  }
+
+  private matchOrCreateTrack(det: MirageDetection, area: number, now: number): TrackedObject {
     let bestTrack: TrackedObject | null = null;
     let bestIoU = 0.25;
 
@@ -148,6 +176,9 @@ export class HazardEngine {
       bestTrack.bbox = det.bbox;
       bestTrack.seenCount += 1;
       bestTrack.lastSeenAt = now;
+      if (area < bestTrack.baselineArea) {
+        bestTrack.baselineArea = area;
+      }
       return bestTrack;
     }
 
@@ -155,6 +186,8 @@ export class HazardEngine {
       trackId: this.nextTrackId++,
       classId: det.classId,
       bbox: det.bbox,
+      baselineArea: area,
+      firstSeenAt: now,
       seenCount: 1,
       lastSeenAt: now,
       lastAlertedAt: 0,
@@ -167,16 +200,17 @@ export class HazardEngine {
     base: HazardPriority,
     bbox: NormalizedBBox,
     direction: HazardDirection,
-    area: number
+    area: number,
+    isApproaching: boolean
   ): HazardPriority {
     const inPath = direction === 'center' || direction === 'ahead';
 
-    // P0 reserved for large obstacles filling the immediate lower-center walking path.
-    if (inPath && area >= 0.25 && bbox.y2 >= 0.8) {
+    // P0 reserved for large immediate lower-center obstacles or rapidly approaching path hazards.
+    if (inPath && ((area >= 0.25 && bbox.y2 >= 0.8) || (isApproaching && area >= 0.14))) {
       return 'P0';
     }
-    if (base === 'P2' && inPath && area >= 0.1) {
-      return 'P1';
+    if ((base === 'P2' && inPath && area >= 0.1) || isApproaching) {
+      return base === 'P0' ? 'P0' : 'P1';
     }
     return base;
   }

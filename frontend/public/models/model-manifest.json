@@ -69,6 +69,31 @@
         "slower"
       ],
       "status": "optional"
+    },
+    {
+      "id": "mediapipe-efficientdet-v1",
+      "name": "MediaPipe EfficientDet-Lite0",
+      "version": "0.10.22",
+      "task": "realtime-object-detection",
+      "url": "/models/efficientdet_lite0.tflite",
+      "fileSizeBytes": 4602795,
+      "sha256": "0720bf247bd76e6594ea28fa9c6f7c5242be774818997dbbeffc4da460c723bb",
+      "source": "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/int8/1/efficientdet_lite0.tflite",
+      "license": "Apache-2.0",
+      "inputSize": [320, 320],
+      "runtime": "mediapipe-gpu",
+      "supportedClasses": [
+        "person",
+        "vehicle",
+        "motorcycle",
+        "bicycle",
+        "bus",
+        "truck",
+        "dog",
+        "cow",
+        "obstacle"
+      ],
+      "status": "bundled"
     }
   ]
 }

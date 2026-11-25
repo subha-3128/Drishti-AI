@@ -5,24 +5,27 @@ export interface AdaptiveFrameParams {
   batterySaverEnabled: boolean;
 }
 
-const MIN_DELAY_MS = 60;
-const BASE_DELAY_MS = 140;
+const FAST_ACTIVE_DELAY_MS = 45;
+const BASE_DELAY_MS = 100;
+const YIELD_DELAY_MS = 60;
 const STATIONARY_DELAY_MS = 2200;
 
 /**
- * Computes inter-frame delay to maximize walking responsiveness on slower mobile devices
- * while still dialing down cadence when standing still with battery saver enabled.
+ * Computes inter-frame delay to deliver smooth 15-20+ FPS tracking when GPU-accelerated,
+ * minimize idle gaps on slower CPUs, and conserve battery when standing still.
  */
 export function computeNextFrameDelayMs(params: AdaptiveFrameParams): number {
   if (params.hasUrgentHazard) {
-    return MIN_DELAY_MS;
+    return FAST_ACTIVE_DELAY_MS;
   }
   if (params.batterySaverEnabled && params.isStationary) {
     return STATIONARY_DELAY_MS;
   }
+  if (params.inferenceMs <= 120) {
+    return FAST_ACTIVE_DELAY_MS;
+  }
   if (params.inferenceMs > 1200) {
-    // Yield briefly for UI/TTS events without adding hundreds of ms of extra blind wait time.
-    return MIN_DELAY_MS;
+    return YIELD_DELAY_MS;
   }
   return BASE_DELAY_MS;
 }

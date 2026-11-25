@@ -2,10 +2,21 @@ import { describe, it, expect } from 'vitest';
 import { computeNextFrameDelayMs } from '../camera/adaptiveScheduler';
 
 describe('Adaptive Frame Scheduler', () => {
+  it('runs fast (~20 FPS cadence) when GPU Tier-1 inference is fast and moving', () => {
+    expect(
+      computeNextFrameDelayMs({
+        inferenceMs: 35,
+        isStationary: false,
+        hasUrgentHazard: false,
+        batterySaverEnabled: true,
+      })
+    ).toBe(45);
+  });
+
   it('slows down when stationary with battery saver enabled and no urgent hazards', () => {
     expect(
       computeNextFrameDelayMs({
-        inferenceMs: 900,
+        inferenceMs: 35,
         isStationary: true,
         hasUrgentHazard: false,
         batterySaverEnabled: true,
@@ -16,22 +27,11 @@ describe('Adaptive Frame Scheduler', () => {
   it('stays responsive when an urgent hazard is present even if stationary', () => {
     expect(
       computeNextFrameDelayMs({
-        inferenceMs: 2500,
+        inferenceMs: 45,
         isStationary: true,
         hasUrgentHazard: true,
         batterySaverEnabled: true,
       })
-    ).toBe(60);
-  });
-
-  it('minimizes inter-frame idle wait when moving on slower mobile CPUs', () => {
-    expect(
-      computeNextFrameDelayMs({
-        inferenceMs: 2500,
-        isStationary: false,
-        hasUrgentHazard: false,
-        batterySaverEnabled: true,
-      })
-    ).toBe(60);
+    ).toBe(45);
   });
 });

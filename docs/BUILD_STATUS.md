@@ -9,9 +9,10 @@
 - **Python:** `3.14.8` | **Java:** OpenJDK 26
 - **Android SDK / Gradle:** Not installed locally (`adb`, `sdkmanager`, `gradle` absent); Capacitor Android project (`frontend/android/`) is scaffolded, synced, and ready to build APK in Android Studio.
 
-## AI Architecture (Cactus Mirage + Optional Cactus Whistle)
-- **Sole Vision Model:** **Cactus Mirage** (`mirage.cact`, 21,611,043 bytes, SHA-256 `4249a0f7515272ff76b66c7fb4f17fce1e66f9f237`, Apache-2.0).
-- **Voice Command Model (Opt-In):** **Cactus Whistle** (`whistle.cact`, 16,919,407 bytes, SHA-256 `b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb`, Apache-2.0), co-loaded in the same WASM worker (~86 MB WASM heap combined; 69 ms measured speech transcription latency in Node WASM).
+## AI Architecture (Two-Tier On-Device Pipeline)
+- **Tier 1 Fast Reflex Model:** **MediaPipe EfficientDet-Lite0** (`efficientdet_lite0.tflite`, 4,602,795 bytes, SHA-256 `0720bf247bd76e6594ea28fa9c6f7c5242be774818997dbbeffc4da460c723bb`, Apache-2.0) via `@mediapipe/tasks-vision` GPU delegate.
+- **Tier 2 Scene Model:** **Cactus Mirage** (`mirage.cact`, 21,611,043 bytes, SHA-256 `4249a0f7515272ff76b66c7fb4f17fce1e66f9f237`, Apache-2.0).
+- **Voice Command Model (Opt-In):** **Cactus Whistle** (`whistle.cact`, 16,919,407 bytes, SHA-256 `b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb`, Apache-2.0), co-loaded in the same WASM worker (`~86 MB` WASM heap combined; `69 ms` measured speech transcription latency in Node WASM).
 - **Runtime:** Official Cactus Compute `4.1.4` WebAssembly (`cactus.js` + `cactus.wasm`, commit `a224d3629bad90d1a0d7792183cea12cdd1fb75e`, Apache-2.0).
 
 ## Milestone Tracker

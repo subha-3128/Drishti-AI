@@ -10,6 +10,7 @@ import {
 import { AppState, transitionAppState } from './app/stateMachine';
 import { CameraManager, CameraStatus } from './camera/cameraManager';
 import { computeNextFrameDelayMs, MotionMonitor } from './camera/adaptiveScheduler';
+import { FastDetectorService } from './ai/fast/fastDetectorService';
 import { MirageDetection } from './ai/mirage/mirageAdapter';
 import { MirageInferenceError, MirageService } from './ai/mirage/mirageService';
 import { clearModelCache, isModelCached } from './ai/inference/modelCache';
@@ -25,14 +26,16 @@ import { SettingsView } from './screens/SettingsView';
 import { SafetyView } from './screens/SafetyView';
 
 type Tab = 'home' | 'settings' | 'safety';
-const MIRAGE_MODEL_URL = '/models/mirage.cact';
+const FAST_MODEL_URL = '/models/efficientdet_lite0.tflite';
+const MIRAGE_INTERVAL_MS = 4500;
+const TICK_INTERVAL_MS = 2000;
 
 export default function App() {
   const [settings, setSettings] = useState<DrishtiSettings>(() => loadSettings());
   const [tab, setTab] = useState<Tab>('home');
   const [appState, setAppState] = useState<AppState>('idle');
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>('idle');
-  const [aiStatus, setAiStatus] = useState<string>('Idle (Mirage not loaded)');
+  const [aiStatus, setAiStatus] = useState<string>('Idle (AI not loaded)');
   const [voiceCmdStatus, setVoiceCmdStatus] = useState<string>('Disabled');
   const [powerSaverActive, setPowerSaverActive] = useState<boolean>(false);
   const [isOnline, setIsOnline] = useState<boolean>(() =>
@@ -54,6 +57,9 @@ export default function App() {
   const settingsRef = useRef<DrishtiSettings>(settings);
   const lastAlertRef = useRef<HazardAlert | null>(null);
   const liveDetectionsRef = useRef<MirageDetection[]>([]);
+  const mirageSceneRef = useRef<MirageDetection[]>([]);
+  const lastMirageAtRef = useRef<number>(0);
+  const lastTickAtRef = useRef<number>(0);
 
   settingsRef.current = settings;
   lastAlertRef.current = lastAlert;
@@ -65,6 +71,9 @@ export default function App() {
   const [voiceAvailability, setVoiceAvailability] = useState<VoiceAvailability>(() =>
     voiceRef.current!.getAvailability()
   );
+
+  const fastDetectorRef = useRef<FastDetectorService | null>(null);
+  if (!fastDetectorRef.current) fastDetectorRef.current = new FastDetectorService();
 
   const mirageRef = useRef<MirageService | null>(null);
   if (!mirageRef.current) mirageRef.current = new MirageService();
@@ -134,7 +143,7 @@ export default function App() {
     const onOffline = () => setIsOnline(false);
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
-    isModelCached(MIRAGE_MODEL_URL).then(setModelCached).catch(() => {});
+    isModelCached(FAST_MODEL_URL).then(setModelCached).catch(() => {});
     const unsubVoice = voiceRef.current?.subscribeAvailability(setVoiceAvailability);
 
     return () => {
@@ -164,6 +173,7 @@ export default function App() {
       motionRef.current?.stop();
       cameraRef.current?.stop();
       hazardEngineRef.current?.reset();
+      mirageSceneRef.current = [];
       releaseWakeLock();
       clearOverlay();
       setLiveDetections([]);
@@ -205,6 +215,7 @@ export default function App() {
       motionRef.current?.stop();
       micVadRef.current?.stop();
       cameraRef.current?.stop();
+      fastDetectorRef.current?.terminate();
       mirageRef.current?.terminate();
       voiceRef.current?.dispose();
       releaseWakeLock();
@@ -245,71 +256,99 @@ export default function App() {
     }
   }, []);
 
+  const emitAlerts = useCallback((alerts: HazardAlert[]) => {
+    if (alerts.length === 0) return;
+    setLastAlert(alerts[0]);
+    for (const alert of alerts) {
+      voiceRef.current?.enqueue(alert.message, alert.priority, alert.direction);
+    }
+  }, []);
+
   const scheduleNextFrame = useCallback(() => {
     const runFrame = async () => {
       if (appStateRef.current !== 'active') return;
       const cam = cameraRef.current;
+      const fast = fastDetectorRef.current;
       const mirage = mirageRef.current;
-      if (!cam || !mirage) return;
+      const video = videoRef.current;
+      if (!cam || !fast || !video) return;
 
-      let nextDelayMs = 150;
-      if (!mirage.isBusy()) {
-        const frame = cam.captureNewestFrame();
-        if (frame) {
-          try {
-            const cur = settingsRef.current;
-            const result = await mirage.detectFrame(frame.imageData, cur.minConfidence, frame.timestamp);
-            if (result && appStateRef.current === 'active') {
-              setInferenceMs(result.inferenceMs);
-              setLiveDetections(result.detections);
-              if (cur.showCameraPreview) {
-                drawOverlay(result.detections);
-              }
+      const now = Date.now();
+      const cur = settingsRef.current;
+      let nextDelayMs = 45;
 
-              const alerts = hazardEngineRef.current?.processDetections(result.detections, Date.now()) ?? [];
-              if (alerts.length > 0) {
-                setLastAlert(alerts[0]);
-                for (const alert of alerts) {
-                  voiceRef.current?.enqueue(alert.message, alert.priority, alert.direction);
+      try {
+        // Tier 1: Real-time GPU/MediaPipe reflex detection (~20-50 ms/frame).
+        const fastResult = await fast.detectVideo(video, cur.minConfidence);
+        if (fastResult && appStateRef.current === 'active') {
+          setInferenceMs(fastResult.inferenceMs);
+          const mergedView = [...fastResult.detections, ...mirageSceneRef.current];
+          setLiveDetections(mergedView);
+          if (cur.showCameraPreview) {
+            drawOverlay(mergedView);
+          }
+
+          const alerts = hazardEngineRef.current?.processDetections(fastResult.detections, now) ?? [];
+          if (alerts.length > 0) {
+            emitAlerts(alerts);
+          } else if (now - lastTickAtRef.current >= TICK_INTERVAL_MS) {
+            lastTickAtRef.current = now;
+            voiceRef.current?.playScanningTick();
+          }
+
+          const stationary = motionRef.current?.isStationary() ?? false;
+          const hasUrgentHazard = alerts.some((a) => a.priority === 'P0' || a.priority === 'P1');
+          setPowerSaverActive(cur.batterySaverEnabled && stationary && !hasUrgentHazard);
+          nextDelayMs = computeNextFrameDelayMs({
+            inferenceMs: fastResult.inferenceMs,
+            isStationary: stationary,
+            hasUrgentHazard,
+            batterySaverEnabled: cur.batterySaverEnabled,
+          });
+        }
+
+        // Tier 2: Non-blocking Cactus Mirage scene context enrichment (stairs/barriers/trees) every 4.5s.
+        if (
+          mirage?.isReady() &&
+          !mirage.isBusy() &&
+          now - lastMirageAtRef.current >= MIRAGE_INTERVAL_MS &&
+          !(cur.batterySaverEnabled && (motionRef.current?.isStationary() ?? false))
+        ) {
+          const frame = cam.captureNewestFrame();
+          if (frame) {
+            lastMirageAtRef.current = now;
+            const scanOpId = operationIdRef.current;
+            mirage
+              .detectFrame(frame.imageData, cur.minConfidence, frame.timestamp)
+              .then((mRes) => {
+                if (!mRes || appStateRef.current !== 'active' || operationIdRef.current !== scanOpId) return;
+                // Keep static/context hazards from Mirage without duplicating Tier-1 dynamic boxes.
+                const sceneExtras = mRes.detections.filter(
+                  (d) => d.classId === 'stairs' || d.classId === 'barrier' || d.classId === 'tree'
+                );
+                mirageSceneRef.current = sceneExtras;
+                const sceneAlerts =
+                  hazardEngineRef.current?.processDetections(sceneExtras, Date.now()) ?? [];
+                emitAlerts(sceneAlerts);
+              })
+              .catch((err) => {
+                if (
+                  err instanceof MirageInferenceError &&
+                  err.timedOut &&
+                  appStateRef.current === 'active' &&
+                  operationIdRef.current === scanOpId
+                ) {
+                  mirageRef.current?.initialize(startAbortRef.current?.signal).catch(() => {});
                 }
-              } else {
-                voiceRef.current?.playScanningTick();
-              }
-
-              const stationary = motionRef.current?.isStationary() ?? false;
-              const hasUrgentHazard = alerts.some((a) => a.priority === 'P0' || a.priority === 'P1');
-              setPowerSaverActive(cur.batterySaverEnabled && stationary && !hasUrgentHazard);
-              nextDelayMs = computeNextFrameDelayMs({
-                inferenceMs: result.inferenceMs,
-                isStationary: stationary,
-                hasUrgentHazard,
-                batterySaverEnabled: cur.batterySaverEnabled,
               });
-            }
-          } catch (err) {
-            if (err instanceof MirageInferenceError && err.timedOut && appStateRef.current === 'active') {
-              const recoveryOpId = operationIdRef.current;
-              const recoverySignal = startAbortRef.current?.signal;
-              try {
-                await mirageRef.current?.initialize(recoverySignal);
-                if (appStateRef.current === 'active' && operationIdRef.current === recoveryOpId && !recoverySignal?.aborted) {
-                  loopTimerRef.current = window.setTimeout(runFrame, 300);
-                  return;
-                }
-                return;
-              } catch {
-                if (operationIdRef.current !== recoveryOpId || recoverySignal?.aborted) {
-                  return;
-                }
-              }
-            }
-            const msg = err instanceof Error ? err.message : 'Cactus Mirage processing failed.';
-            setErrorBanner(msg);
-            voiceRef.current?.speakImmediateSystem('AI processing error. Assistance stopped.');
-            stopAssistance('');
-            return;
           }
         }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Vision processing failed.';
+        setErrorBanner(msg);
+        voiceRef.current?.speakImmediateSystem('AI processing error. Assistance stopped.');
+        stopAssistance('');
+        return;
       }
 
       if (appStateRef.current === 'active') {
@@ -317,8 +356,8 @@ export default function App() {
       }
     };
 
-    loopTimerRef.current = window.setTimeout(runFrame, 80);
-  }, [drawOverlay, stopAssistance]);
+    loopTimerRef.current = window.setTimeout(runFrame, 50);
+  }, [drawOverlay, emitAlerts, stopAssistance]);
 
   const startAssistance = useCallback(async () => {
     if (
@@ -340,21 +379,25 @@ export default function App() {
     if (!step1.accepted) return;
     appStateRef.current = step1.nextState;
     setAppState(step1.nextState);
-    setAiStatus('Initializing Cactus Mirage...');
+    setAiStatus('Initializing real-time GPU detector...');
     voiceRef.current?.enqueue('AI is initializing.', 'P2');
 
+    let tier1Summary = '';
     try {
-      const { modelName, runtime } = await mirageRef.current!.initialize(controller.signal);
+      tier1Summary = await fastDetectorRef.current!.initialize(
+        controller.signal,
+        settingsRef.current.minConfidence
+      );
       if (opId !== operationIdRef.current || controller.signal.aborted) {
         return;
       }
-      setAiStatus(`Ready (${modelName} • ${runtime})`);
+      setAiStatus(`Ready (${tier1Summary} • Loading Mirage...)`);
       setModelCached(true);
     } catch (err) {
       if (opId !== operationIdRef.current || controller.signal.aborted) {
         return;
       }
-      const msg = err instanceof Error ? err.message : 'Failed to load Cactus Mirage.';
+      const msg = err instanceof Error ? err.message : 'Failed to load fast object detector.';
       setAiStatus('Model Error');
       setErrorBanner(msg);
       const errRes = transitionAppState(appStateRef.current, 'model_error');
@@ -398,8 +441,8 @@ export default function App() {
 
     const activeRes = transitionAppState(appStateRef.current, 'active', {
       cameraRunning: cameraRef.current!.getStatus() === 'active',
-      modelLoaded: mirageRef.current!.isReady(),
-      aiInitialized: mirageRef.current!.isReady(),
+      modelLoaded: fastDetectorRef.current!.isReady(),
+      aiInitialized: fastDetectorRef.current!.isReady(),
     });
 
     if (!activeRes.accepted) {
@@ -413,6 +456,20 @@ export default function App() {
     motionRef.current?.start();
     voiceRef.current?.speakImmediateSystem('Assistance started.');
     scheduleNextFrame();
+
+    // Initialize Cactus Mirage scene reader in the background without blocking startup.
+    mirageRef.current
+      ?.initialize(controller.signal)
+      .then(({ modelName }) => {
+        if (opId === operationIdRef.current && !controller.signal.aborted) {
+          setAiStatus(`Ready (${tier1Summary} + ${modelName})`);
+        }
+      })
+      .catch(() => {
+        if (opId === operationIdRef.current && !controller.signal.aborted) {
+          setAiStatus(`Ready (${tier1Summary})`);
+        }
+      });
   }, [scheduleNextFrame, stopAssistance]);
 
   const speakCurrentSceneSummary = useCallback(() => {
@@ -661,6 +718,7 @@ export default function App() {
               }
               onClearModelCache={async () => {
                 if (!isRunning) {
+                  fastDetectorRef.current?.terminate();
                   mirageRef.current?.terminate();
                 }
                 await clearModelCache();

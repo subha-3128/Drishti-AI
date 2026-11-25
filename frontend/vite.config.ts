@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/drishti-icon.svg', 'models/*', 'cactus/*'],
+      includeAssets: ['icons/drishti-icon.svg', 'models/*', 'cactus/*', 'mediapipe/*'],
       manifest: {
         name: 'Drishti AI — दृष्टि',
         short_name: 'Drishti AI',
@@ -26,7 +26,12 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,mjs,css,html,svg,json}', 'cactus/*.{js,wasm}', 'models/*.{cact,json}'],
+        globPatterns: [
+          '**/*.{js,mjs,css,html,svg,json}',
+          'cactus/*.{js,wasm}',
+          'mediapipe/*.{js,wasm}',
+          'models/*.{cact,tflite,json}',
+        ],
         cleanupOutdatedCaches: true,
         maximumFileSizeToCacheInBytes: 30 * 1024 * 1024,
       },

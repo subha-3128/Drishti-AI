@@ -25,9 +25,9 @@ export function SafetyView() {
       <h3>Current Model Coverage &amp; Honest Limits</h3>
       <ul>
         <li>
-          Drishti AI runs <strong>Cactus Mirage</strong> (<code>mirage.cact</code> via Cactus
-          WebAssembly) on-device to identify supported obstacles such as people, vehicles,
-          bicycles, dogs, stairs, barriers, and static obstacles.
+          Drishti AI runs a two-tier on-device vision pipeline: <strong>MediaPipe EfficientDet-Lite0 GPU</strong>{' '}
+          for smooth real-time obstacle &amp; approaching-hazard tracking, plus <strong>Cactus Mirage</strong>{' '}
+          (<code>mirage.cact</code>) in the background for scene context (stairs, barriers, trees).
         </li>
         <li>
           Custom Indian street hazards (open drains, potholes, broken footpaths, open manholes,

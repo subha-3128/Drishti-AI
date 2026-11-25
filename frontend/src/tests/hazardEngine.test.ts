@@ -78,4 +78,31 @@ describe('Hazard Engine', () => {
     engine.processDetections([tinyPerson], 1000);
     expect(engine.processDetections([tinyPerson], 1300)).toHaveLength(0);
   });
+
+  it('detects approaching dynamic hazards across rapid high-FPS frames without false stale triggers', () => {
+    const makePerson = (w: number, h: number): MirageDetection => ({
+      id: 11,
+      rawLabel: 'person',
+      classId: 'person',
+      spokenName: 'Person',
+      confidence: 0.58,
+      bbox: { x1: 0.5 - w / 2, y1: 0.85 - h, x2: 0.5 + w / 2, y2: 0.85 },
+    });
+
+    const staleGapEngine = new HazardEngine({ minConfidence: 0.4, cooldownMs: 4500 });
+    staleGapEngine.processDetections([makePerson(0.16, 0.3)], 1000);
+    staleGapEngine.processDetections([makePerson(0.18, 0.33)], 1150);
+    staleGapEngine.processDetections([makePerson(0.21, 0.38)], 1300);
+    expect(staleGapEngine.processDetections([makePerson(0.32, 0.48)], 2700)).toHaveLength(0);
+
+    const rapidEngine = new HazardEngine({ minConfidence: 0.4, cooldownMs: 4500 });
+    rapidEngine.processDetections([makePerson(0.18, 0.35)], 1000);
+    rapidEngine.processDetections([makePerson(0.2, 0.38)], 1400);
+    rapidEngine.processDetections([makePerson(0.23, 0.42)], 1900);
+    rapidEngine.processDetections([makePerson(0.27, 0.46)], 2400);
+    const urgent = rapidEngine.processDetections([makePerson(0.34, 0.5)], 2950);
+    expect(urgent).toHaveLength(1);
+    expect(urgent[0].priority).toBe('P0');
+    expect(urgent[0].message).toBe('Person approaching center ahead.');
+  });
 });

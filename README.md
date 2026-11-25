@@ -12,10 +12,11 @@
 - Indian street hazards (open drains, potholes, open manholes, broken footpaths, auto-rickshaws) are **not** enabled until evaluated on documented Indian pedestrian datasets.
 - Always use primary mobility aids and remain alert.
 
-## Architecture (React + TypeScript + Vite PWA + Capacitor Android + Cactus Compute WASM)
+## Architecture (React + TypeScript + Vite PWA + Capacitor Android)
 
-- **Sole Vision AI:** **Cactus Mirage** (`mirage.cact`, 20.6 MB, Apache-2.0) running locally on-device via **Cactus 4.1.4 WebAssembly** (`cactus.js` + `cactus.wasm`, Apache-2.0) inside `frontend/src/workers/mirage.worker.ts`.
-- **Hands-Free Voice Commands (Opt-In):** **Cactus Whistle** (`whistle.cact`, 16.1 MB, Apache-2.0) co-loaded in the same WASM worker for offline speech commands (*"Start"*, *"Pause"*, *"Repeat"*, *"What is ahead"*, *"Faster"*, *"Slower"*).
+- **Tier 1 Fast Real-Time AI:** **MediaPipe EfficientDet-Lite0** (`efficientdet_lite0.tflite`, 4.4 MB, Apache-2.0) running on GPU WebGL in `frontend/src/ai/fast/fastDetectorService.ts` for low-latency obstacle & approaching-motion tracking.
+- **Tier 2 Rich Scene AI:** **Cactus Mirage** (`mirage.cact`, 20.6 MB, Apache-2.0) running non-blocking in `frontend/src/workers/mirage.worker.ts` for static hazards (`stairs`, `barrier`, `tree`).
+- **Hands-Free Voice Commands (Opt-In):** **Cactus Whistle** (`whistle.cact`, 16.1 MB, Apache-2.0) co-loaded in the same WASM worker for offline commands (*"Start"*, *"Pause"*, *"Repeat"*, *"What is ahead"*, *"Faster"*, *"Slower"*).
 - **Spatial Audio & Directional Haptics:** Web Audio API `StereoPannerNode` left/center/right audio cues paired with Web Speech (`speechSynthesis`) priority queue (`P0`–`P3`) and directional vibration cadences (`navigator.vibrate`).
 - **Adaptive Power Management:** `MotionMonitor` (`DeviceMotionEvent`) + latency-aware backoff slows scan cadence when standing still with no urgent hazards.
 - **Offline PWA & Android Packaging:** Workbox precaches the app shell, Cactus WASM runtime, `mirage.cact`, and `whistle.cact` (~39 MB total) with SHA-256 verification. Capacitor Android wrapper lives in `frontend/android/`.
