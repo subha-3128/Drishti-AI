@@ -1,0 +1,8 @@
+node_modules/
+frontend/dist/
+frontend/dev-dist/
+.DS_Store
+*.log
+__pycache__/
+*.pyc
+.venv/

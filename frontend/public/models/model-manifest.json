@@ -1,0 +1,32 @@
+{
+  "manifestVersion": "1.0.0",
+  "models": [
+    {
+      "id": "yolox-nano-coco",
+      "name": "YOLOX-Nano (COCO Pretrained)",
+      "version": "0.1.1rc0",
+      "task": "object-detection",
+      "url": "/models/yolox_nano.onnx",
+      "fileSizeBytes": 3659407,
+      "sha256": "c789161ed43c8269fcd4e67c67eeeb4e80c622da2eb296a20bc6007bd18a0b7d",
+      "source": "https://github.com/Megvii-BaseDetection/YOLOX/releases/download/0.1.1rc0/yolox_nano.onnx",
+      "license": "Apache-2.0",
+      "inputSize": [416, 416],
+      "runtime": "onnxruntime-web",
+      "supportedClasses": [
+        "person",
+        "bicycle",
+        "car",
+        "motorcycle",
+        "bus",
+        "truck",
+        "dog",
+        "cow",
+        "bench",
+        "chair",
+        "suitcase"
+      ],
+      "status": "bundled"
+    }
+  ]
+}
